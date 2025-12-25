@@ -1,3 +1,7 @@
+"""
+Django settings for core project - PRODUCTION VERCEL
+"""
+
 from pathlib import Path
 import os
 from dotenv import load_dotenv
