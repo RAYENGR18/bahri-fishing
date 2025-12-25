@@ -1,0 +1,15 @@
+# Ignorer les environnements virtuels
+venv/
+env/
+.env
+.DS_Store
+
+# Ignorer les fichiers compilés Python
+__pycache__/
+*.py[cod]
+
+# Ignorer les dossiers Node (Frontend)
+node_modules/
+dist/
+build/
+.vscode/
