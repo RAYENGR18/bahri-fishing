@@ -32,12 +32,15 @@ const Navbar = () => {
     navigate('/');
   };
 
+  // Dans Navbar.jsx
+
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-        // Redirection vers une page de recherche (si vous en avez une)
-        // Sinon, vous pouvez créer une page SearchResults.jsx plus tard
-        console.log("Recherche pour:", searchQuery);
+        // 🚀 ACTION : On redirige vers l'accueil avec le mot-clé dans l'URL
+        navigate(`/?search=${encodeURIComponent(searchQuery)}`);
+        
+        // On ferme le menu mobile et on vide (optionnel)
         setIsMenuOpen(false);
     }
   };
