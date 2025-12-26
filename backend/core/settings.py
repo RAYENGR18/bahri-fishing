@@ -93,12 +93,12 @@ CORS_ALLOW_ALL_ORIGINS = False
 
 # On autorise EXPLICITEMENT votre site Frontend
 CORS_ALLOWED_ORIGINS = [
-    "https://bahri-frontend-sigma.vercel.app",  # 👈 VOTRE SITE
+    "https://bahri-fishing.vercel.app/",  # 👈 VOTRE SITE
 ]
 
 # Indispensable pour que le Login et les Commandes fonctionnent
 CSRF_TRUSTED_ORIGINS = [
-    "https://bahri-frontend-sigma.vercel.app",
+    "https://bahri-fishing.vercel.app/",
     "https://bahri-backend.vercel.app",
 ]
 
