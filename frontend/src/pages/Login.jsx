@@ -18,7 +18,7 @@ const Login = () => {
         const result = await login(email, password);
         
         if (result.success) {
-            // Redirection vers l'accueil après succès
+            // ✅ RETOUR À L'ACCUEIL (Banner + Catégories)
             navigate('/');
         } else {
             setError(result.error);
