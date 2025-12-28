@@ -1,3 +1,4 @@
+import os
 import random
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -183,7 +184,7 @@ class GoogleLoginView(APIView):
         try:
             # 1. Vérif Google
             # Remplace par ton CLIENT_ID
-            CLIENT_ID = "TON_CLIENT_ID.apps.googleusercontent.com" 
+            CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
             id_info = id_token.verify_oauth2_token(token, google_requests.Request(), CLIENT_ID)
 
             email = id_info['email']
