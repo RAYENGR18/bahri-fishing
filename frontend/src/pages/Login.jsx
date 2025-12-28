@@ -1,6 +1,8 @@
 import React, { useState, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
+import client from '../api/client'; // <-- Import API
+import { GoogleLogin } from '@react-oauth/google'; // <-- Import Google
 
 const Login = () => {
     const [email, setEmail] = useState('');
@@ -10,6 +12,29 @@ const Login = () => {
     const { login } = useContext(AuthContext);
     const navigate = useNavigate();
 
+    // --- Gestionnaire Connexion Google ---
+    const handleGoogleSuccess = async (credentialResponse) => {
+        setError('');
+        try {
+            // On envoie le token Google au Backend
+            const res = await client.post('/users/google-login/', {
+                token: credentialResponse.credential
+            });
+
+            if (res.data.tokens) {
+                // On stocke le token
+                localStorage.setItem('token', res.data.tokens.access);
+                
+                // On redirige vers l'accueil (rechargement pour mettre à jour l'AuthContext)
+                window.location.href = '/'; 
+            }
+        } catch (err) {
+            console.error("Erreur Google:", err);
+            setError("Échec de la connexion Google.");
+        }
+    };
+
+    // --- Gestionnaire Connexion Classique ---
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
@@ -39,7 +64,28 @@ const Login = () => {
                     </div>
                 )}
 
-                <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+                {/* --- SECTION GOOGLE --- */}
+                <div className="mt-6 flex justify-center">
+                    <GoogleLogin 
+                        text="signin_with" // Affiche "Se connecter avec Google"
+                        onSuccess={handleGoogleSuccess}
+                        onError={() => setError("Échec de la connexion Google")}
+                        width="300"
+                    />
+                </div>
+
+                {/* Séparateur */}
+                <div className="relative mt-6">
+                    <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-gray-300"></div>
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                        <span className="px-2 bg-white text-gray-500">Ou avec votre email</span>
+                    </div>
+                </div>
+
+                {/* --- FORMULAIRE CLASSIQUE --- */}
+                <form className="mt-6 space-y-6" onSubmit={handleSubmit}>
                     <div className="rounded-md shadow-sm -space-y-px">
                         <div>
                             <input
@@ -63,7 +109,6 @@ const Login = () => {
                         </div>
                     </div>
 
-                    {/* --- AJOUT DU LIEN MOT DE PASSE OUBLIÉ --- */}
                     <div className="flex items-center justify-end">
                         <div className="text-sm">
                             <Link to="/forgot-password" className="font-medium text-bahri-blue hover:text-opacity-80">
@@ -71,7 +116,6 @@ const Login = () => {
                             </Link>
                         </div>
                     </div>
-                    {/* ------------------------------------------ */}
 
                     <div>
                         <button
