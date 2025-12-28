@@ -118,6 +118,26 @@ class ForgotPasswordView(APIView):
             return Response({"error": f"Erreur d'envoi d'email: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response({"message": "Code envoyé à votre adresse email"}, status=status.HTTP_200_OK)
+class VerifyCodeView(APIView):
+    """Vérifie seulement si le code est valide (avant de changer le mot de passe)"""
+    def post(self, request):
+        email = request.data.get('email')
+        code = request.data.get('code')
+
+        if not email or not code:
+            return Response({"error": "Email et code requis"}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects(email=email).first()
+        if not user:
+            return Response({"error": "Utilisateur introuvable"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Vérification MongoEngine
+        reset_entry = PasswordResetCode.objects(user=user, code=code).first()
+
+        if not reset_entry:
+            return Response({"error": "Code invalide ou expiré"}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({"message": "Code valide"}, status=status.HTTP_200_OK)
 
 
 class ResetPasswordView(APIView):
