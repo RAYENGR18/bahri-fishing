@@ -1,4 +1,3 @@
-// frontend/src/pages/Login.jsx
 import React, { useState, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
@@ -18,7 +17,6 @@ const Login = () => {
         const result = await login(email, password);
         
         if (result.success) {
-            // ✅ RETOUR À L'ACCUEIL (Banner + Catégories)
             navigate('/');
         } else {
             setError(result.error);
@@ -36,7 +34,7 @@ const Login = () => {
                 </div>
                 
                 {error && (
-                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded text-sm">
                         {error}
                     </div>
                 )}
@@ -64,6 +62,16 @@ const Login = () => {
                             />
                         </div>
                     </div>
+
+                    {/* --- AJOUT DU LIEN MOT DE PASSE OUBLIÉ --- */}
+                    <div className="flex items-center justify-end">
+                        <div className="text-sm">
+                            <Link to="/forgot-password" className="font-medium text-bahri-blue hover:text-opacity-80">
+                                Mot de passe oublié ?
+                            </Link>
+                        </div>
+                    </div>
+                    {/* ------------------------------------------ */}
 
                     <div>
                         <button

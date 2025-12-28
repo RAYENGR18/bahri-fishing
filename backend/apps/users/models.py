@@ -48,3 +48,15 @@ class User(me.Document):
 
     def __str__(self):
         return self.email
+class PasswordResetCode(me.Document):
+    # ReferenceField fait le lien avec ton modèle User
+    user = me.ReferenceField(User, required=True)
+    code = me.StringField(required=True, max_length=6)
+    created_at = me.DateTimeField(default=datetime.utcnow)
+
+    meta = {
+        'collection': 'password_reset_codes',  # Nom de la collection dans MongoDB
+        'indexes': [
+            {'fields': ['created_at'], 'expireAfterSeconds': 3600} # Optionnel : le code s'efface seul après 1h
+        ]
+    }

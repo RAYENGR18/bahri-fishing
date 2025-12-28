@@ -3,16 +3,19 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
 // Import des Composants
 import Navbar from './components/Navbar';
-import Footer from './components/Footer'; // ✅ AJOUT DU FOOTER
+import Footer from './components/Footer';
 
 // Import des Pages
-import HomePage from './pages/HomePage';       // ✅ NOUVELLE ACCUEIL (Banner)
-import ProductsPage from './pages/ProductsPage'; // ✅ ANCIENNEMENT HOME (Liste produits)
-import AboutPage from './pages/AboutPage';     // ✅ NOUVELLE PAGE
-import ContactPage from './pages/ContactPage'; // ✅ NOUVELLE PAGE
+import HomePage from './pages/HomePage';
+import ProductsPage from './pages/ProductsPage';
+import AboutPage from './pages/AboutPage';
+import ContactPage from './pages/ContactPage';
 
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword'; // <-- AJOUT IMPORT
+import ResetPassword from './pages/ResetPassword';   // <-- AJOUT IMPORT
+
 import Cart from './pages/Cart';
 import Profile from './pages/Profile';
 import AdminDashboard from './pages/AdminDashboard';
@@ -23,7 +26,6 @@ import AdminProductForm from './pages/AdminProductForm';
 import ProductDetails from './pages/ProductDetails';
 import MyOrders from './pages/MyOrders';
 
-// Import des Contextes
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 
@@ -34,24 +36,25 @@ function App() {
         <Router>
           <div className="min-h-screen bg-gray-50 flex flex-col">
             
-            {/* Navbar toujours en haut */}
             <Navbar />
             
-            {/* Le contenu pousse le footer vers le bas */}
             <div className="flex-grow">
               <Routes>
-                {/* --- NOUVELLES ROUTES --- */}
                 <Route path="/" element={<HomePage />} />
                 <Route path="/products" element={<ProductsPage />} />
                 <Route path="/about" element={<AboutPage />} />
                 <Route path="/contact" element={<ContactPage />} />
                 
-                {/* --- ROUTES EXISTANTES --- */}
+                {/* --- Authentification --- */}
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
-                <Route path="/cart" element={<Cart />} />
                 
-                {/* Routes Connectées */}
+                {/* --- NOUVELLES ROUTES --- */}
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                {/* ----------------------- */}
+
+                <Route path="/cart" element={<Cart />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/category/:slug" element={<CategoryPage />} />
                 <Route path="/search" element={<SearchPage />} />
@@ -66,7 +69,6 @@ function App() {
               </Routes>
             </div>
 
-            {/* Footer toujours en bas */}
             <Footer /> 
 
           </div>
