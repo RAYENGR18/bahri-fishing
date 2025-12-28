@@ -4,8 +4,9 @@ from .views import (
     LoginView, 
     ProfileView, 
     ProfileUpdateView, 
-    ForgotPasswordView, # <-- Nouvelle vue importée
-    ResetPasswordView   # <-- Nouvelle vue importée
+    ForgotPasswordView, 
+    ResetPasswordView,
+    VerifyCodeView   # <--- 1. N'oublie pas d'importer la vue ici !
 )
 
 urlpatterns = [
@@ -17,7 +18,8 @@ urlpatterns = [
     path('profile/', ProfileView.as_view(), name='profile'),
     path('profile/update/', ProfileUpdateView.as_view(), name='profile-update'),
 
-    # Réinitialisation de mot de passe (Nouveau)
+    # Réinitialisation de mot de passe
     path('forgot-password/', ForgotPasswordView.as_view(), name='forgot-password'),
+    path('verify-code/', VerifyCodeView.as_view(), name='verify-code'), # <--- 2. Ajoute cette ligne indispensable
     path('reset-password/', ResetPasswordView.as_view(), name='reset-password'),
 ]
