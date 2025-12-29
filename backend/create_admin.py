@@ -7,39 +7,67 @@ django.setup()
 
 from apps.users.models import User
 
-def create_super_admin():
+def create_or_update_admin():
     # Données de l'admin
     EMAIL = "rayengragba18@gmail.com"
-    PASSWORD = "RAYstam1502*"  # ⚠️ À changer en prod !
+    PASSWORD = "RAYstam1502*" 
     
-    # Vérification si l'admin existe déjà
-    if User.objects(email=EMAIL).first():
-        print(f"⚠️ L'utilisateur {EMAIL} existe déjà.")
-        return
+    print(f"🔄 Traitement de l'utilisateur : {EMAIL}...")
 
-    # Création
-    try:
-        admin = User(
-            email=EMAIL,
-            first_name="Super",
-            last_name="Admin",
-            is_admin=True,          # Le flag important
-            is_active=True,
-            loyalty_points=1000.00  # Bonus admin
-        )
+    # 2. On cherche si l'utilisateur existe déjà
+    user = User.objects(email=EMAIL).first()
+
+    if user:
+        # --- CAS 1 : MISE À JOUR (Ton compte Google existant) ---
+        print(f"⚠️ L'utilisateur existe déjà. Mise à jour des droits Admin...")
         
-        # Hachage du mot de passe (via notre méthode custom)
-        admin.set_password(PASSWORD)
-        admin.save()
+        user.is_admin = True
+        user.first_name = user.first_name or "Super"
+        user.last_name = user.last_name or "Admin"
         
-        print("✅ ===========================================")
-        print(f"✅ Administrateur créé avec succès !")
-        print(f"📧 Email    : {EMAIL}")
-        print(f"🔑 Password : {PASSWORD}")
-        print("✅ ===========================================")
+        # On lui donne 1000 points si c'est pas déjà fait
+        if user.points < 1000:
+            user.points = 1000
+            
+        # On définit le mot de passe (pour que tu puisses te connecter sans Google aussi)
+        user.set_password(PASSWORD)
         
-    except Exception as e:
-        print(f"❌ Erreur lors de la création : {e}")
+        # On met à jour le provider pour dire qu'il a maintenant les deux accès
+        if user.auth_provider == 'google':
+            user.auth_provider = 'email_and_google'
+            
+        user.save()
+        print("✅ Compte existant promu Administrateur avec succès !")
+
+    else:
+        # --- CAS 2 : CRÉATION (Nouveau compte) ---
+        print(f"✨ Création d'un nouvel Administrateur...")
+        
+        try:
+            user = User(
+                email=EMAIL,
+                first_name="Super",
+                last_name="Admin",
+                is_admin=True,      # Le flag important
+                is_active=True,
+                points=1000,        # Attention: c'est 'points' (Int), pas loyalty_points
+                auth_provider='email'
+            )
+            
+            user.set_password(PASSWORD)
+            user.save()
+            print("✅ Nouvel Administrateur créé avec succès !")
+            
+        except Exception as e:
+            print(f"❌ Erreur lors de la création : {e}")
+            return
+
+    # Résumé
+    print("✅ ===========================================")
+    print(f"📧 Email    : {EMAIL}")
+    print(f"🔑 Password : {PASSWORD}")
+    print(f"👑 Rôle     : ADMIN (is_admin=True)")
+    print("✅ ===========================================")
 
 if __name__ == "__main__":
-    create_super_admin()
+    create_or_update_admin()
