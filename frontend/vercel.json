@@ -1,20 +1,11 @@
 {
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
-    }
-  ],
   "headers": [
     {
-      "source": "/api/(.*)",
+      "source": "/(.*)",
       "headers": [
-        { "key": "Access-Control-Allow-Credentials", "value": "true" },
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET,OPTIONS,PATCH,DELETE,POST,PUT" },
         {
-          "key": "Access-Control-Allow-Headers",
-          "value": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization"
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; img-src 'self' data: https://*.googleusercontent.com https://res.cloudinary.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; script-src 'self' 'unsafe-inline' https://accounts.google.com; frame-src https://accounts.google.com; connect-src 'self' https://bahri-backend.vercel.app https://accounts.google.com;"
         }
       ]
     }

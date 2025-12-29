@@ -9,28 +9,29 @@ const Login = () => {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
 
-    // 🔥 IMPORTANT : on récupère loginWithGoogle
     const { login, loginWithGoogle } = useContext(AuthContext);
     const navigate = useNavigate();
 
-    // ================= GOOGLE LOGIN =================
+    // ================= GOOGLE LOGIN (🔥 CORRIGÉ) =================
     const handleGoogleSuccess = async (credentialResponse) => {
         setError('');
         try {
+            // 🔥 CORRECTION : Envoie 'credential', pas 'token'
             const res = await client.post('/users/google-login/', {
-                token: credentialResponse.credential
+                credential: credentialResponse.credential
             });
 
             const { user, tokens } = res.data;
 
-            // ✅ MISE À JOUR DU CONTEXTE GLOBAL
+            // Mise à jour du contexte
             loginWithGoogle(user, tokens);
 
-            // ✅ REDIRECTION NORMALE
+            // Redirection
             navigate('/');
         } catch (err) {
-            console.error("Erreur Google:", err);
-            setError("Échec de la connexion Google.");
+            console.error("❌ Erreur Google:", err);
+            console.error("Détails:", err.response?.data);
+            setError(err.response?.data?.error || "Échec de la connexion Google");
         }
     };
 
@@ -69,7 +70,10 @@ const Login = () => {
                 <div className="flex justify-center mt-6">
                     <GoogleLogin
                         onSuccess={handleGoogleSuccess}
-                        onError={() => setError("Échec de la connexion Google")}
+                        onError={() => {
+                            console.error("❌ Échec Google Login");
+                            setError("Échec de la connexion Google");
+                        }}
                     />
                 </div>
 
