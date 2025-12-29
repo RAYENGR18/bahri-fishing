@@ -1,27 +1,27 @@
 import os
 import random
+import secrets
+import string
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.core.mail import send_mail
 from django.conf import settings
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
-import secrets
-import string
 
 # Imports locaux
 from .serializers import RegisterSerializer, LoginSerializer, UserSerializer, UpdateProfileSerializer
-from .models import User, PasswordResetCode  # <-- On importe le nouveau modèle ici
+from .models import User, PasswordResetCode
 from .authentication import generate_tokens, JWTAuthentication
 
 # =================================================================
-# 1. INSCRIPTION & CONNEXION
+# 1. INSCRIPTION & CONNEXION CLASSIQUE
 # =================================================================
 
 class RegisterView(APIView):
-    """Inscription utilisateur public"""
+    permission_classes = [AllowAny]
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
@@ -35,14 +35,13 @@ class RegisterView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class LoginView(APIView):
-    """Connexion et récupération JWT"""
+    permission_classes = [AllowAny]
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
             email = serializer.validated_data['email']
             password = serializer.validated_data['password']
             
-            # MongoEngine: Syntaxe avec parenthèses sans .filter
             user = User.objects(email=email).first()
             
             if user and user.check_password(password):
@@ -55,6 +54,81 @@ class LoginView(APIView):
             return Response({"error": "Identifiants invalides"}, status=status.HTTP_401_UNAUTHORIZED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+# =================================================================
+# 2. GOOGLE LOGIN (C'est ici que ça se joue)
+# =================================================================
+
+class GoogleLoginView(APIView):
+    """Gère l'inscription ET la connexion via Google"""
+    permission_classes = [AllowAny] # Important : Tout le monde peut appeler cette route
+
+    def post(self, request):
+        token = request.data.get('token')
+        if not token:
+            return Response({"error": "Token manquant"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # 1. Vérif Google
+            CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
+            # Si tu n'as pas de variable d'env locale, tu peux hardcoder l'ID ici pour tester :
+            # CLIENT_ID = "ton-id-google-client.apps.googleusercontent.com"
+            
+            id_info = id_token.verify_oauth2_token(token, google_requests.Request(), CLIENT_ID)
+
+            email = id_info['email']
+            first_name = id_info.get('given_name', 'Utilisateur')
+            last_name = id_info.get('family_name', '')
+            picture = id_info.get('picture', '')
+
+            # 2. On cherche si l'utilisateur existe déjà
+            user = User.objects(email=email).first()
+
+            if user:
+                # --- CAS : CONNEXION ---
+                tokens = generate_tokens(user)
+                return Response({
+                    "message": "Connexion réussie",
+                    "user": UserSerializer(user).data,
+                    "tokens": tokens
+                }, status=status.HTTP_200_OK)
+            
+            else:
+                # --- CAS : INSCRIPTION ---
+                alphabet = string.ascii_letters + string.digits
+                random_password = ''.join(secrets.choice(alphabet) for i in range(20))
+
+                new_user = User(
+                    email=email,
+                    first_name=first_name,
+                    last_name=last_name,
+                    password=random_password,
+                    phone="Non renseigné",
+                    address="Non renseigné",
+                    city="Non renseigné",
+                    is_active=True
+                    # Tu peux ajouter avatar=picture si ton modèle le supporte
+                )
+                
+                new_user.set_password(random_password)
+                new_user.save()
+
+                tokens = generate_tokens(new_user)
+                return Response({
+                    "message": "Inscription Google réussie.",
+                    "user": UserSerializer(new_user).data,
+                    "tokens": tokens
+                }, status=status.HTTP_201_CREATED)
+
+        except ValueError:
+            return Response({"error": "Token Google invalide"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# =================================================================
+# 3. GESTION DU PROFIL & PASSWORD (Reste inchangé)
+# =================================================================
+# ... Garde tes classes ProfileView, ForgotPasswordView, etc. ici ...
+# Je ne les recopie pas pour ne pas surcharger, elles étaient correctes.
 # =================================================================
 # 2. GESTION DU PROFIL
 # =================================================================
@@ -174,70 +248,3 @@ class ResetPasswordView(APIView):
         reset_entry.delete()
 
         return Response({"message": "Mot de passe modifié avec succès"}, status=status.HTTP_200_OK)
-class GoogleLoginView(APIView):
-    """Gère l'inscription ET la connexion via Google"""
-    def post(self, request):
-        token = request.data.get('token')
-        if not token:
-            return Response({"error": "Token manquant"}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            # 1. Vérif Google
-            # Remplace par ton CLIENT_ID
-            CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
-            id_info = id_token.verify_oauth2_token(token, google_requests.Request(), CLIENT_ID)
-
-            email = id_info['email']
-            first_name = id_info.get('given_name', 'Utilisateur')
-            last_name = id_info.get('family_name', '')
-
-            # 2. On cherche si l'utilisateur existe déjà
-            user = User.objects(email=email).first()
-
-            if user:
-                # --- CAS : CONNEXION (L'utilisateur existe déjà) ---
-                tokens = generate_tokens(user)
-                return Response({
-                    "message": "Connexion réussie",
-                    "user": UserSerializer(user).data,
-                    "tokens": tokens
-                }, status=status.HTTP_200_OK)
-            
-            else:
-                # --- CAS : INSCRIPTION (On crée le compte) ---
-                
-                # On génère un mot de passe complexe aléatoire (car il est requis)
-                alphabet = string.ascii_letters + string.digits
-                random_password = ''.join(secrets.choice(alphabet) for i in range(20))
-
-                # ATTENTION : On remplit les champs obligatoires de ton modèle
-                # avec des valeurs par défaut pour que MongoEngine ne bloque pas.
-                new_user = User(
-                    email=email,
-                    first_name=first_name,
-                    last_name=last_name,
-                    password=random_password, # Sera haché par set_password
-                    
-                    # Champs obligatoires que Google ne donne pas :
-                    phone="Non renseigné",
-                    address="Non renseigné",
-                    city="Non renseigné",
-                    
-                    is_active=True
-                )
-                
-                # Hachage du mot de passe
-                new_user.set_password(random_password)
-                new_user.save()
-
-                tokens = generate_tokens(new_user)
-                return Response({
-                    "message": "Inscription Google réussie. Pensez à compléter votre profil !",
-                    "user": UserSerializer(new_user).data,
-                    "tokens": tokens
-                }, status=status.HTTP_201_CREATED)
-
-        except ValueError:
-            return Response({"error": "Token Google invalide"}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

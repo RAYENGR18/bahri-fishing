@@ -1,22 +1,26 @@
 import axios from 'axios';
 
 const client = axios.create({
-    // MODIFICATION IMPORTANTE :
-    // 1. Si une variable VITE_API_URL existe (ex: en local), on l'utilise.
-    // 2. Sinon (sur Vercel), on utilise le chemin relatif '/api'.
-    // Cela signifie que client.post('/users/...') deviendra 'https://ton-site.vercel.app/api/users/...'
-    baseURL: import.meta.env.VITE_API_URL || '/api',
+    // LOGIQUE IMPORTANTE :
+    // 1. En PROD (Vercel) : Il utilisera la variable d'environnement VITE_API_URL
+    // 2. En LOCAL : Il utilisera http://127.0.0.1:8000 (Le port par défaut de Django)
+    baseURL: import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000', 
     
     headers: {
         'Content-Type': 'application/json',
+        // Django a parfois besoin de ça pour accepter les requêtes JSON
+        'Accept': 'application/json', 
     },
+    // Important pour que les cookies/sessions passent si besoin (optionnel avec JWT pur mais recommandé)
+    withCredentials: true 
 });
 
-// --- L'INTERCEPTEUR : GESTION DU TOKEN (Rien à changer ici, c'est parfait) ---
+// --- L'INTERCEPTEUR : GESTION DU TOKEN ---
 client.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('token');
         if (token) {
+            // Django SimpleJWT attend souvent "Bearer <token>"
             config.headers.Authorization = `Bearer ${token}`;
         }
         return config;
@@ -29,14 +33,14 @@ client.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response && error.response.status === 401) {
-            // Token expiré ou invalide -> On déconnecte proprement
+            // Token expiré ou invalide
             localStorage.removeItem('token');
-            // Si tu stockes d'autres infos user, supprime-les aussi
-            // localStorage.removeItem('user'); 
+            localStorage.removeItem('user');
             
-            // Redirection forcée vers le login
-            // Note : Ceci recharge la page, ce qui est acceptable pour une déconnexion de sécurité
-            window.location.href = '/login';
+            // On redirige vers le login uniquement si on n'y est pas déjà
+            if (window.location.pathname !== '/login') {
+                window.location.href = '/login';
+            }
         }
         return Promise.reject(error);
     }

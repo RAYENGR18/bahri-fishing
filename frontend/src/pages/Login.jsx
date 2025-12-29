@@ -17,7 +17,7 @@ const Login = () => {
         setError('');
         try {
             // On envoie le token Google au Backend
-            const res = await client.post('/users/google-login', {
+            const res = await client.post('/users/google-login/', {
                 token: credentialResponse.credential
             });
 
