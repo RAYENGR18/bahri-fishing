@@ -73,19 +73,19 @@ const AdminDashboard = () => {
         }
     };
 
-    // --- LOGIQUE COMMANDES ---
     const requestStatusChange = (orderId, newStatus) => {
         setConfirmModal({
             isOpen: true,
             title: "Changer le statut",
-            message: `Passer la commande en "${newStatus}" ?`,
+            message: `Voulez-vous vraiment passer cette commande en "${newStatus}" ? Les points de fidélité seront mis à jour si applicable.`,
             isDanger: newStatus === 'CANCELLED',
             action: async () => {
                 try {
                     await client.post(`/admin/orders/${orderId}/update/`, { status: newStatus });
                     setRefresh(prev => prev + 1);
-                    setConfirmModal(prev => ({ ...prev, isOpen: false }));
-                } catch (err) { console.error(err); }
+                } catch (err) {
+                    console.error("Erreur update", err);
+                }
             }
         });
     };
@@ -94,14 +94,15 @@ const AdminDashboard = () => {
         setConfirmModal({
             isOpen: true,
             title: "Supprimer la commande",
-            message: "⚠️ Irréversible. Supprimer définitivement ?",
+            message: "⚠️ Attention : Cette action est irréversible. Voulez-vous vraiment supprimer cette commande définitivement ?",
             isDanger: true,
             action: async () => {
                 try {
                     await client.delete(`/admin/orders/${orderId}/delete/`);
                     setRefresh(prev => prev + 1);
-                    setConfirmModal(prev => ({ ...prev, isOpen: false }));
-                } catch (err) { console.error(err); }
+                } catch (err) {
+                    console.error("Erreur suppression", err);
+                }
             }
         });
     };
