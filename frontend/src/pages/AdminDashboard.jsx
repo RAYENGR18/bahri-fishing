@@ -106,7 +106,7 @@ const AdminDashboard = () => {
         });
     };
 
-    // --- LOGIQUE UTILISATEURS (NOUVEAU) ---
+    // --- LOGIQUE UTILISATEURS ---
     
     // 1. Ouvrir le modal de gestion (Historique + Points)
     const handleManageUser = async (user) => {
@@ -147,13 +147,33 @@ const AdminDashboard = () => {
         }
     };
 
+    // 4. Supprimer un utilisateur (NOUVELLE FONCTIONNALITÉ AJOUTÉE)
+    const requestDeleteUser = (userId) => {
+        setConfirmModal({
+            isOpen: true,
+            title: "Supprimer l'utilisateur",
+            message: "⚠️ Attention : Cette action est irréversible. L'utilisateur et toutes ses commandes seront définitivement supprimés.",
+            isDanger: true,
+            action: async () => {
+                try {
+                    await client.delete(`/users/admin/users/${userId}/`);
+                    setRefresh(prev => prev + 1); // Rafraîchir la liste
+                    setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                } catch (err) {
+                    console.error(err);
+                    alert("Erreur lors de la suppression de l'utilisateur");
+                }
+            }
+        });
+    };
+
 
     if (!stats) return <div className="min-h-screen flex items-center justify-center text-bahri-blue font-bold">Chargement...</div>;
 
     return (
         <div className="max-w-7xl mx-auto px-4 py-8 relative min-h-screen">
             
-            {/* Modal de Confirmation (Commandes) */}
+            {/* Modal de Confirmation (Utilisé pour Commandes et Utilisateurs) */}
             <ConfirmModal 
                 isOpen={confirmModal.isOpen}
                 onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
@@ -202,7 +222,7 @@ const AdminDashboard = () => {
             </div>
 
             {/* =========================================================================
-                                         ONGLET COMMANDES
+                                             ONGLET COMMANDES
                ========================================================================= */}
             {activeTab === 'orders' && (
                 <div className="animate-fade-in">
@@ -278,7 +298,7 @@ const AdminDashboard = () => {
             )}
 
             {/* =========================================================================
-                                         ONGLET UTILISATEURS
+                                             ONGLET UTILISATEURS
                ========================================================================= */}
             {activeTab === 'users' && (
                 <div className="animate-fade-in">
@@ -324,13 +344,23 @@ const AdminDashboard = () => {
                                                 {u.points} pts
                                             </span>
                                         </td>
+                                        {/* 👇 CELLULE MODIFIÉE POUR AJOUTER LE BOUTON SUPPRIMER 👇 */}
                                         <td className="px-6 py-4 text-right">
-                                            <button 
-                                                onClick={() => handleManageUser(u)}
-                                                className="text-bahri-blue hover:text-blue-800 font-medium text-sm border border-blue-200 px-3 py-1 rounded hover:bg-blue-50"
-                                            >
-                                                Gérer / Historique
-                                            </button>
+                                            <div className="flex justify-end items-center gap-2">
+                                                <button 
+                                                    onClick={() => handleManageUser(u)}
+                                                    className="text-bahri-blue hover:text-blue-800 font-medium text-sm border border-blue-200 px-3 py-1 rounded hover:bg-blue-50"
+                                                >
+                                                    Gérer / Historique
+                                                </button>
+                                                <button 
+                                                    onClick={() => requestDeleteUser(u.id)}
+                                                    className="text-red-600 hover:text-red-800 border border-red-200 bg-red-50 hover:bg-red-100 p-1.5 rounded transition"
+                                                    title="Supprimer définitivement"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -341,7 +371,7 @@ const AdminDashboard = () => {
             )}
 
             {/* =========================================================================
-                                             MODALS
+                                                 MODALS
                ========================================================================= */}
 
             {/* MODAL DETAILS COMMANDE (Inchangé) */}
@@ -350,7 +380,6 @@ const AdminDashboard = () => {
                     <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 relative max-h-[90vh] overflow-y-auto">
                         <button onClick={() => setSelectedOrder(null)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><XCircle size={24}/></button>
                         <h2 className="text-2xl font-bold mb-6 text-gray-800">Commande #{selectedOrder.id.slice(-6)}</h2>
-                        {/* ... Détails de la commande (inchangé) ... */}
                          {/* Pour alléger le code ici, je garde ton code existant pour l'affichage des items */}
                          <div className="space-y-4">
                             <p><strong>Client:</strong> {selectedOrder.client_name}</p>

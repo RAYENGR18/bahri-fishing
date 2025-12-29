@@ -149,23 +149,29 @@ class AdminUserListView(APIView):
             return Response({"message": "Utilisateur créé avec succès"}, status=201)
         except Exception as e:
             return Response({"error": str(e)}, status=500)
-
 class AdminUserDetailView(APIView):
-    permission_classes = [AllowAny]
+    """
+    Gère les opérations sur un utilisateur spécifique (Admin)
+    GET: Voir l'historique des points
+    PATCH: Modifier les points manuellement (avec log dans l'historique)
+    DELETE: Supprimer l'utilisateur (et ses commandes via cascade si configuré dans le Model)
+    """
+    permission_classes = [AllowAny]  # ⚠️ À changer pour [IsAdminUser] en production
 
     def get(self, request, user_id):
         user = User.objects(id=user_id).first()
         if not user:
-            return Response({"error": "Utilisateur introuvable"}, status=404)
+            return Response({"error": "Utilisateur introuvable"}, status=status.HTTP_404_NOT_FOUND)
         
+        # Récupérer l'historique des points
         history = PointsHistory.objects(user=user).order_by('-created_at')
         serializer = PointsHistorySerializer(history, many=True)
-        return Response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     def patch(self, request, user_id):
         user = User.objects(id=user_id).first()
         if not user:
-            return Response({"error": "Utilisateur introuvable"}, status=404)
+            return Response({"error": "Utilisateur introuvable"}, status=status.HTTP_404_NOT_FOUND)
 
         try:
             new_points = int(request.data.get('points'))
@@ -175,11 +181,13 @@ class AdminUserDetailView(APIView):
             diff = new_points - old_points
             
             if diff == 0:
-                return Response({"message": "Aucun changement de points détecté"}, status=200)
+                return Response({"message": "Aucun changement de points détecté"}, status=status.HTTP_200_OK)
 
+            # Mise à jour de l'utilisateur
             user.points = new_points
             user.save()
 
+            # Création de l'historique (Log)
             PointsHistory(
                 user=user,
                 action="Correction Admin",
@@ -190,12 +198,28 @@ class AdminUserDetailView(APIView):
             return Response({
                 "message": "Points mis à jour avec succès", 
                 "points": user.points
-            })
+            }, status=status.HTTP_200_OK)
 
         except ValueError:
-            return Response({"error": "La valeur des points doit être un nombre entier"}, status=400)
+            return Response({"error": "La valeur des points doit être un nombre entier"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return Response({"error": str(e)}, status=500)
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def delete(self, request, user_id):
+        user = User.objects(id=user_id).first()
+        if not user:
+            return Response({"error": "Utilisateur introuvable"}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            # Note importante : La suppression en cascade des commandes (Orders) 
+            # dépend de la configuration 'reverse_delete_rule=CASCADE' 
+            # dans ton fichier models.py sur le champ 'user' du modèle Order.
+            user.delete()
+            
+            return Response({"message": "Utilisateur et ses données associés supprimés avec succès"}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": f"Erreur suppression : {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 # =================================================================
