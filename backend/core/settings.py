@@ -54,12 +54,12 @@ INSTALLED_APPS = [
 # =========================================================
 
 MIDDLEWARE = [
-    # 👇 La sécurité CORS doit être la PREMIÈRE ligne (ou juste après Security)
-    'corsheaders.middleware.CorsMiddleware',   
-    'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',       # <--- EN PREMIER !
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',   
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
@@ -203,3 +203,4 @@ EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
 
 DEFAULT_FROM_EMAIL = f"Bahri Fishing <{EMAIL_HOST_USER}>"
+SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
