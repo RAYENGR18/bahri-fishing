@@ -116,7 +116,7 @@ class GoogleLoginView(APIView):
 # =================================================================
 
 class AdminUserListView(APIView):
-    permission_classes = [AllowAny] 
+    permission_classes = [IsAdminUser] 
 
     def get(self, request):
         users = User.objects.all().order_by('-date_joined')
@@ -156,7 +156,7 @@ class AdminUserDetailView(APIView):
     PATCH: Modifier les points manuellement (avec log dans l'historique)
     DELETE: Supprimer l'utilisateur (et ses commandes via cascade si configuré dans le Model)
     """
-    permission_classes = [AllowAny]  # ⚠️ À changer pour [IsAdminUser] en production
+    permission_classes = [IsAdminUser]  # ⚠️ À changer pour [IsAdminUser] en production
 
     def get(self, request, user_id):
         user = User.objects(id=user_id).first()
