@@ -12,13 +12,9 @@ from apps.products.models import Product
 from apps.orders.serializers import OrderSerializer
 
 class AdminDashboardStats(APIView):
-    """
-    Statistiques globales pour le dashboard admin
-    """
     permission_classes = [AllowAny]
 
     def get(self, request):
-        # Calcul du revenu (somme des commandes validées/livrées/expédiées)
         orders = Order.objects(status__in=['VALIDATED', 'DELIVERED', 'SHIPPED'])
         revenue = sum(o.final_total for o in orders)
         
@@ -31,9 +27,6 @@ class AdminDashboardStats(APIView):
         })
 
 class AdminOrderListView(APIView):
-    """
-    Liste toutes les commandes pour l'admin
-    """
     permission_classes = [AllowAny]
 
     def get(self, request):
@@ -42,9 +35,6 @@ class AdminOrderListView(APIView):
         return Response(serializer.data)
 
 class AdminUpdateOrderStatus(APIView):
-    """
-    Met à jour le statut d'une commande (Gestion stock + Points fidélité)
-    """
     permission_classes = [AllowAny]
 
     def patch(self, request, order_id):
@@ -62,55 +52,42 @@ class AdminUpdateOrderStatus(APIView):
         previous_status = order.status
 
         # --- 1. GESTION DU STOCK ---
-        # Si la commande passe à VALIDATED pour la première fois, on décrémente le stock
         if new_status == 'VALIDATED' and previous_status != 'VALIDATED':
             print(f"📦 Validation commande {order_id} : Mise à jour des stocks...")
             if order.items:
                 for item in order.items:
                     try:
-                        # Gestion de la référence produit (ID ou Objet selon MongoEngine)
                         p_id = item.product.id if hasattr(item.product, 'id') else item.product
                         product = Product.objects(id=p_id).first()
                         
                         if product:
                             current_stock = int(product.stock)
                             qty_bought = int(item.quantity)
-                            
-                            # On s'assure que le stock ne devient pas négatif
                             new_stock = max(0, current_stock - qty_bought)
                             
                             product.stock = new_stock
                             product.save()
-                            print(f"   - {product.title}: Stock {current_stock} -> {new_stock}")
                     except Exception as e:
-                        print(f"   ! Erreur mise à jour stock produit : {e}")
+                        print(f"   ! Erreur mise à jour stock : {e}")
 
-        # --- 2. GESTION FIDÉLITÉ (Utilisation de points_to_earn) ---
-        # Si la commande est validée ou livrée (et ne l'était pas avant)
+        # --- 2. GESTION FIDÉLITÉ (Correction : Champ 'points' en Int) ---
         if new_status in ['VALIDATED', 'DELIVERED'] and previous_status == 'PENDING':
-            # On récupère les points en attente stockés dans la commande
+            # On récupère les points en attente (probablement Decimal dans Order)
             points_pending = getattr(order, 'points_to_earn', 0)
             
-            # Si l'utilisateur existe et qu'il y a des points à gagner
             if order.user and points_pending > 0:
                 try:
-                    # On s'assure de travailler avec des Decimal ou float
-                    points_pending_decimal = Decimal(str(points_pending))
+                    # ⚠️ Conversion en ENTIER car User.points est un IntField
+                    points_to_add = int(points_pending)
                     
-                    # On récupère le solde actuel (loyalty_points)
-                    current_points = getattr(order.user, 'points', Decimal('0.00'))
-                    if current_points is None: current_points = Decimal('0.00')
+                    # On récupère le solde actuel (ou 0 si vide)
+                    current_points = order.user.points or 0
                     
-                    # Mise à jour du solde utilisateur
-                    new_balance = Decimal(str(current_points)) + points_pending_decimal
-                    
-                    order.user.points = new_balance
+                    # Mise à jour
+                    order.user.points = current_points + points_to_add
                     order.user.save()
                     
-                    print(f"⭐ Points crédités au client {order.user.email} : +{points_pending} (Nouveau solde: {new_balance})")
-                    
-                    # Optionnel : On peut remettre points_to_earn à 0 pour éviter de créditer deux fois
-                    # order.points_to_earn = Decimal('0.00') 
+                    print(f"⭐ Points crédités (Int) : +{points_to_add} -> Nouveau solde : {order.user.points}")
                 except Exception as e:
                     print(f"❌ Erreur crédit points fidélité : {e}")
 
@@ -124,9 +101,6 @@ class AdminUpdateOrderStatus(APIView):
         }, status=status.HTTP_200_OK)
 
 class AdminDeleteOrder(APIView):
-    """
-    Suppression d'une commande
-    """
     permission_classes = [AllowAny]
 
     def delete(self, request, order_id):
