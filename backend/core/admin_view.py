@@ -29,34 +29,6 @@ class AdminDashboardStats(APIView):
         })
 
 # =========================================================
-# 2. LISTE DES UTILISATEURS (CORRIGÉE POUR ÉVITER ERREUR 500)
-# =========================================================
-class AdminUserListView(APIView):
-    permission_classes = [AllowAny]
-
-    def get(self, request):
-        try:
-            users = User.objects.all().order_by('-date_joined')
-            users_data = []
-            
-            # On fait la sérialisation manuellement ici pour être sûr que ça ne plante pas
-            for user in users:
-                users_data.append({
-                    "id": str(user.id),
-                    "email": user.email,
-                    "first_name": user.first_name,
-                    "last_name": user.last_name,
-                    "date_joined": user.date_joined,
-                    "points": user.points, # On utilise bien le champ 'points'
-                    "is_admin": user.is_admin
-                })
-                
-            return Response(users_data, status=status.HTTP_200_OK)
-        except Exception as e:
-            print(f"ERREUR LISTE UTILISATEURS : {str(e)}")
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-# =========================================================
 # 3. LISTE DES COMMANDES
 # =========================================================
 class AdminOrderListView(APIView):

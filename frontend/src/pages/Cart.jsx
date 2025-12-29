@@ -114,7 +114,7 @@ const Cart = () => {
     const loyaltyDeduction = (user && useLoyalty) ? Math.min(parseFloat(user.points), subTotal) : 0;
     const finalTotal = subTotal + shipping - loyaltyDeduction;
     // Points potentiels (5% du sous-total)
-    const pointsToEarn = (subTotal * 0.05).toFixed(2);
+    const pointsToEarn = (subTotal * 0.02).toFixed(2);
 
     return (
         <div className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-2 gap-12">
