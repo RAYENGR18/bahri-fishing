@@ -54,7 +54,7 @@ const Profile = () => {
                 <div className="mb-6 pb-6 border-b flex justify-between items-center">
                     <div>
                         <p className="text-sm text-gray-500">Points de fidélité</p>
-                        <p className="text-3xl font-bold text-bahri-blue">{parseFloat(user.loyalty_points).toFixed(2)} pts</p>
+                        <p className="text-3xl font-bold text-bahri-blue">{parseFloat(user.points).toFixed(2)} pts</p>
                     </div>
                     <div className="text-right">
                         <p className="text-sm text-gray-500">Email (non modifiable)</p>

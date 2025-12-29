@@ -19,8 +19,7 @@ class Order(me.Document):
     )
     
     # --- Utilisateur ou Invité ---
-    # 👇 LA MODIFICATION EST ICI (reverse_delete_rule=me.CASCADE) 👇
-    user = me.ReferenceField(User, required=False, reverse_delete_rule=me.CASCADE) 
+    user = me.ReferenceField(User, required=False) # Null si invité
     
     # Infos Contact & Livraison (Obligatoires pour tous)
     full_name = me.StringField(required=True)
@@ -45,9 +44,5 @@ class Order(me.Document):
     status = me.StringField(choices=STATUS_CHOICES, default='PENDING')
     created_at = me.DateTimeField(default=datetime.utcnow)
     
-    meta = {
-        'collection': 'orders'
-    }
-
     def __str__(self):
         return f"CMD {str(self.id)[-6:]} - {self.full_name}"

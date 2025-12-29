@@ -60,12 +60,12 @@ class CreateOrderView(APIView):
             user = request.user
             
             # A. Gagner des points (5% du total produits)
-            points_to_earn = items_total * Decimal('0.05')
+            points_to_earn = items_total * Decimal('0.02')
             
             # B. Utiliser des points (si demandé par le front : use_loyalty=True)
-            if data.get('use_loyalty') is True and user.loyalty_points > 0:
+            if data.get('use_loyalty') is True and user.points > 0:
                 # 1 Point = 1 TND
-                max_usable = min(user.loyalty_points, items_total)
+                max_usable = min(user.points, items_total)
                 points_used = max_usable
                 discount = max_usable
 
@@ -97,7 +97,7 @@ class CreateOrderView(APIView):
             
             # 7. Débit immédiat des points utilisés
             if user and points_used > 0:
-                user.loyalty_points = Decimal(user.loyalty_points) - points_used
+                user.points = Decimal(user.points) - points_used
                 user.save()
 
             return Response({

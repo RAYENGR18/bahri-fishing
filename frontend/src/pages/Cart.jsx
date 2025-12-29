@@ -111,7 +111,7 @@ const Cart = () => {
     // --- VUE PRINCIPALE ---
     const subTotal = parseFloat(cartTotal);
     const shipping = 7.00;
-    const loyaltyDeduction = (user && useLoyalty) ? Math.min(parseFloat(user.loyalty_points), subTotal) : 0;
+    const loyaltyDeduction = (user && useLoyalty) ? Math.min(parseFloat(user.points), subTotal) : 0;
     const finalTotal = subTotal + shipping - loyaltyDeduction;
     // Points potentiels (5% du sous-total)
     const pointsToEarn = (subTotal * 0.05).toFixed(2);
@@ -248,7 +248,7 @@ const Cart = () => {
                             <span>{shipping.toFixed(2)} TND</span>
                         </div>
                         
-                        {user && user.loyalty_points > 0 && (
+                        {user && user.points > 0 && (
                             <div className="bg-bahri-light/20 p-3 rounded mt-2 border border-bahri-light">
                                 <label className="flex items-center cursor-pointer gap-2">
                                     <input 
@@ -258,7 +258,7 @@ const Cart = () => {
                                         className="w-4 h-4 text-bahri-blue rounded focus:ring-bahri-blue" 
                                     />
                                     <span className="text-sm font-semibold text-bahri-blue">
-                                        Utiliser mes points ({parseFloat(user.loyalty_points).toFixed(2)} pts)
+                                        Utiliser mes points ({parseFloat(user.points).toFixed(2)} pts)
                                     </span>
                                 </label>
                                 {useLoyalty && (

@@ -29,7 +29,7 @@ class User(me.Document):
 
     # --- 4. Rôles & Fidélité ---
     # On utilise 'points' (Int) au lieu de 'loyalty_points' (Decimal) pour simplifier le calcul
-    points = me.IntField(default=0)
+    points= me.IntField(default=0)
     
     is_admin = me.BooleanField(default=False)
     is_active = me.BooleanField(default=True)

@@ -35,61 +35,50 @@ class AdminUpdateOrderStatus(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request, order_id):
-        print(f"\n--- 🔍 DÉBUT DU DEBUG FIDÉLITÉ (Order: {order_id}) ---")
-        try:
-            new_status = request.data.get('status')
-            order = Order.objects(id=order_id).first()
-            
-            if not order:
-                return Response({"error": "Commande introuvable"}, status=404)
+        new_status = request.data.get('status')
+        order = Order.objects(id=order_id).first()
+        
+        if not order:
+            return Response({"error": "Commande introuvable"}, status=404)
 
-            print(f"1. Statut actuel: {order.status} -> Nouveau: {new_status}")
+        previous_status = order.status
 
-            # --- GESTION STOCK (On le garde court) ---
-            if new_status == 'VALIDATED' and order.status != 'VALIDATED':
-                for item in order.items:
-                    if item.product:
-                        Product.objects(id=item.product.id).update_one(inc__stock=-int(item.quantity))
+        # --- 1. GESTION DU STOCK (NOUVEAU) ---
+        # Si on valide la commande, on décrémente le stock
+        if new_status == 'VALIDATED' and previous_status != 'VALIDATED':
+            print(f"📦 Validation commande {order_id} : Mise à jour des stocks...")
+            for item in order.items:
+                try:
+                    # On récupère le produit
+                    product = Product.objects(id=item.product_id).first()
+                    if product:
+                        current_stock = int(product.stock)
+                        qty_bought = int(item.quantity)
 
-            # --- GESTION FIDÉLITÉ (DEBUG APPROFONDI) ---
-            if new_status in ['VALIDATED', 'DELIVERED'] and order.status == 'PENDING':
-                
-                # A. Vérifier les points
-                points = getattr(order, 'points_to_earn', 0)
-                if not points and order.total_amount:
-                    points = int(order.total_amount)
-                
-                print(f"2. Points à ajouter : {points}")
-
-                # B. Vérifier l'utilisateur
-                if order.user:
-                    user_id = order.user.id
-                    print(f"3. Utilisateur trouvé ! ID : {user_id}")
-                    print(f"4. Ancien solde (avant update) : {order.user.loyalty_points}")
-
-                    # C. Update Atomique
-                    try:
-                        result = User.objects(id=user_id).update_one(inc__loyalty_points=points)
-                        print(f"5. Résultat update MongoDB : {result}")
+                        # Calcul du nouveau stock (ne descend pas sous 0)
+                        new_stock = max(0, current_stock - qty_bought)
                         
-                        # Vérification immédiate
-                        updated_user = User.objects(id=user_id).first()
-                        print(f"6. NOUVEAU SOLDE CONFIRMÉ : {updated_user.loyalty_points}")
-                        
-                    except Exception as e:
-                        print(f"❌ ERREUR UPDATE USER : {e}")
-                else:
-                    print("❌ ERREUR : Cette commande n'est liée à aucun utilisateur (order.user est Vide/Null)")
+                        product.stock = new_stock
+                        product.save()
+                        print(f"   - {product.title}: Stock {current_stock} -> {new_stock}")
+                except Exception as e:
+                    print(f"   ! Erreur mise à jour stock pour produit {item.product_id}: {e}")
 
-            # Mise à jour statut
-            Order.objects(id=order_id).update_one(set__status=new_status)
-            
-            print("--- ✅ FIN DU DEBUG ---\n")
-            return Response({"message": f"Statut mis à jour : {new_status}"})
+        # --- 2. GESTION FIDÉLITÉ (EXISTANT) ---
+        # Créditer les points si on valide ou livre
+        if new_status in ['VALIDATED', 'DELIVERED'] and previous_status == 'PENDING':
+            points = getattr(order, 'points_to_earn', 0)
+            if order.user and points > 0:
+                current_points = float(order.user.points)
+                to_add = float(points)
+                order.user.points = current_points + to_add
+                order.user.save()
 
-        except Exception as e:
-            print(f"❌ CRASH TOTAL : {e}")
-            return Response({"error": str(e)}, status=500)
+        # Sauvegarde du statut final
+        order.status = new_status
+        order.save()
+
+        return Response({"message": f"Statut mis à jour : {new_status}"})
 
 class AdminDeleteOrder(APIView):
     permission_classes = [AllowAny]
