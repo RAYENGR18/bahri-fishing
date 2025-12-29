@@ -11,23 +11,20 @@ const MyOrders = () => {
     const [orders, setOrders] = useState([]); 
     const [isLoadingData, setIsLoadingData] = useState(true);
 
-     // 1. Effet de Sécurité : Rediriger si pas connecté
     useEffect(() => {
         if (!loading && !user) {
             navigate('/login');
+            return;
         }
-    }, [user, loading, navigate]);
 
-    // 2. Effet de Chargement : On charge les données UNE SEULE FOIS
-    useEffect(() => {
         if (user) {
             fetchMyOrders();
-            // On met à jour les points une seule fois au chargement du composant
-            refreshUser();
+            // --- MAGIE ICI ---
+            // On met à jour les points chaque fois qu'on vient sur cette page
+            refreshUser(); 
         }
-        // 👇 LE SECRET EST ICI : Tableau vide [] = "Exécute-toi une seule fois au montage"
-        // On retire 'user' et 'refreshUser' d'ici pour casser la boucle infinie.
-    }, []);
+    // Ajoutez refreshUser aux dépendances pour éviter les avertissements
+    }, [user, loading, refreshUser]); 
 
     const fetchMyOrders = async () => {
         try {
