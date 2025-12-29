@@ -12,7 +12,7 @@ from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from google.oauth2 import id_token
-from google.auth.transport import requests as google_requests
+from google.auth.transport import requests as google_requests 
 
 # Imports locaux
 from .serializers import (
@@ -30,45 +30,47 @@ from .authentication import generate_tokens, JWTAuthentication
 @method_decorator(csrf_exempt, name='dispatch')
 class GoogleLoginView(APIView):
     """
-    Gère l'inscription ET la connexion via Google.
-    Met à jour l'avatar et le google_id si nécessaire.
+    Gère l'inscription ET la connexion via Google avec FUSION DE COMPTES.
     """
     permission_classes = [AllowAny]
 
     def post(self, request):
-        # On récupère 'credential' (envoyé par le frontend React)
         token = request.data.get('credential')
-        
         if not token:
             return Response({"error": "Token Google manquant"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
+            # 1. Vérifier le token Google
             CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
-            
-            # Vérification du token Google
-            id_info = id_token.verify_oauth2_token(
-                token, 
-                google_requests.Request(), 
-                CLIENT_ID
-            )
+            id_info = id_token.verify_oauth2_token(token, google_requests.Request(), CLIENT_ID)
 
-            # Extraction des infos
+            # 2. Extraire les infos
             email = id_info.get('email')
             google_id = id_info.get('sub')
-            avatar = id_info.get('picture', '') # Photo de profil
+            avatar = id_info.get('picture', '')
             first_name = id_info.get('given_name', 'Utilisateur')
             last_name = id_info.get('family_name', '')
             
-            # Recherche de l'utilisateur
+            # 3. RECHERCHE INTELLIGENTE (C'est ici que la magie opère)
+            # On cherche par email, peu importe comment le compte a été créé au début
             user = User.objects(email=email).first()
 
             if user:
-                # --- CAS 1 : CONNEXION ---
-                # On met à jour les infos manquantes (avatar, google_id)
+                # --- SCÉNARIO FUSION : Le compte existe déjà (créé par mot de passe ou Google) ---
+                print(f"🔄 Fusion de compte pour : {email}")
+                
+                # On met à jour les infos Google si elles manquent (Liaison du compte)
                 updated = False
+                
+                # Si l'utilisateur n'avait pas de Google ID (compte manuel), on l'ajoute !
                 if not user.google_id:
                     user.google_id = google_id
+                    # On change le provider pour dire qu'il supporte maintenant Google aussi
+                    if user.auth_provider == 'email':
+                        user.auth_provider = 'email_and_google' 
                     updated = True
+                
+                # On met à jour l'avatar si l'utilisateur n'en avait pas
                 if not user.avatar:
                     user.avatar = avatar
                     updated = True
@@ -76,24 +78,28 @@ class GoogleLoginView(APIView):
                 if updated:
                     user.save()
 
+                # On connecte l'utilisateur
                 tokens = generate_tokens(user)
                 return Response({
-                    "message": "Connexion réussie",
+                    "message": "Connexion réussie (Comptes liés)",
                     "user": UserSerializer(user).data,
                     "tokens": tokens
                 }, status=status.HTTP_200_OK)
             
             else:
-                # --- CAS 2 : INSCRIPTION ---
+                # --- SCÉNARIO INSCRIPTION : Nouvel utilisateur ---
+                print(f"✨ Création nouveau compte Google pour : {email}")
+                
+                # On génère un mot de passe aléatoire (car Django en a besoin, même si pas utilisé)
                 random_password = secrets.token_urlsafe(16)
 
                 new_user = User(
                     email=email,
                     first_name=first_name,
                     last_name=last_name,
-                    google_id=google_id, # Nouveau champ
-                    avatar=avatar,       # Nouveau champ
-                    auth_provider="google",
+                    google_id=google_id,
+                    avatar=avatar,
+                    auth_provider="google", # Origine principale
                     points=0,
                     is_active=True
                 )
@@ -111,8 +117,8 @@ class GoogleLoginView(APIView):
         except ValueError:
             return Response({"error": "Token Google invalide"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+            print(f"Erreur Login: {str(e)}")
+            return Response({"error": "Erreur serveur lors de la connexion"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # =================================================================
 # 2. ADMINISTRATION (POUR TON DASHBOARD) - NOUVEAU 🚨
