@@ -42,8 +42,6 @@ const Navbar = () => {
         setIsMenuOpen(false);
     }
   };
-  console.log("User connecté :", user);
-  console.log("Est Admin ?", user?.is_admin);
 
   return (
     <nav className="bg-bahri-blue text-white shadow-lg sticky top-0 z-50 font-sans">
@@ -106,7 +104,7 @@ const Navbar = () => {
           {/* --- 4. ICONES ACTIONS (Panier/User) --- */}
           <div className="flex items-center space-x-5 shrink-0 ml-4">
 
-            {/* Admin Link - Modified to be visible on md screens and up */}
+            {/* Admin Link */}
             {user && user.is_admin && (
                 <Link to="/admin" className="text-yellow-400 hover:text-yellow-200 hidden md:flex items-center gap-1 font-bold text-xs bg-white/10 px-3 py-1.5 rounded-full transition">
                     <ShieldCheck size={16} /> <span>Admin</span>
@@ -125,10 +123,16 @@ const Navbar = () => {
 
             {/* User */}
             {user ? (
-                <div className="hidden md:flex items-center space-x-3 pl-2 border-l border-white/20">
+                <div className="hidden md:flex items-center space-x-4 pl-4 border-l border-white/20">
+                    
+                    {/* 👇 AJOUT ICI : Lien Mes Commandes (Desktop) 👇 */}
+                    <Link to="/my-orders" className="hover:text-bahri-light transition flex flex-col items-center" title="Mes Commandes">
+                        <Package size={24} />
+                    </Link>
+
                     <Link to="/profile" className="text-right leading-tight hover:opacity-80 transition">
                         <div className="text-sm font-bold">{user.first_name}</div>
-                        <div className="text-[10px] text-bahri-light font-mono">{parseFloat(user.points || 0).toFixed(0)} pts</div> {/* Changed loyalty_points to points */}
+                        <div className="text-[10px] text-bahri-light font-mono">{parseFloat(user.points || 0).toFixed(0)} pts</div>
                     </Link>
                     <button onClick={handleLogout} className="hover:text-red-300 transition" title="Déconnexion">
                         <LogOut size={22} />
@@ -150,7 +154,7 @@ const Navbar = () => {
 
       {/* --- MENU MOBILE RESPONSIVE --- */}
       {isMenuOpen && (
-        <div className="md:hidden bg-bahri-blue border-t border-white/10 shadow-2xl animate-fade-in-down h-screen overflow-y-auto">
+        <div className="md:hidden bg-bahri-blue border-t border-white/10 shadow-2xl animate-fade-in-down h-screen overflow-y-auto pb-20">
 
             {/* Search Mobile */}
             <div className="p-4">
@@ -177,7 +181,7 @@ const Navbar = () => {
                     📦 Tout le Catalogue
                 </Link>
                 
-                {/* Admin Link Mobile - Added here */}
+                {/* Admin Link Mobile */}
                 {user && user.is_admin && (
                      <Link to="/admin" className="block py-3 px-2 text-lg font-bold border-b border-white/5 text-yellow-400" onClick={() => setIsMenuOpen(false)}>
                         🛡️ Dashboard Admin
@@ -231,10 +235,17 @@ const Navbar = () => {
                                 <p className="text-xs opacity-70">{user.email}</p>
                             </div>
                         </div>
-                        <Link to="/profile" onClick={() => setIsMenuOpen(false)} className="block bg-white/10 text-center py-2 rounded font-bold">
+
+                        {/* 👇 AJOUT ICI : Lien Mes Commandes (Mobile) 👇 */}
+                        <Link to="/my-orders" onClick={() => setIsMenuOpen(false)} className="block bg-white/10 text-center py-2 rounded font-bold hover:bg-white/20 transition flex items-center justify-center gap-2">
+                            <Package size={18}/> Mes Commandes
+                        </Link>
+
+                        <Link to="/profile" onClick={() => setIsMenuOpen(false)} className="block bg-white/10 text-center py-2 rounded font-bold hover:bg-white/20 transition">
                             Mon Profil ({parseFloat(user.points || 0).toFixed(0)} pts)
                         </Link>
-                        <button onClick={handleLogout} className="block w-full text-left py-2 text-red-300 font-bold">
+                        
+                        <button onClick={handleLogout} className="block w-full text-left py-2 text-red-300 font-bold hover:text-red-200 transition">
                             Déconnexion
                         </button>
                     </div>
