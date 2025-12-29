@@ -10,6 +10,8 @@ from django.core.mail import send_mail
 from django.conf import settings
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 
 # Imports locaux
 from .serializers import RegisterSerializer, LoginSerializer, UserSerializer, UpdateProfileSerializer

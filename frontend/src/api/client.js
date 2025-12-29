@@ -1,43 +1,49 @@
 import axios from 'axios';
 
 const client = axios.create({
-    // LOGIQUE IMPORTANTE :
-    // 1. En PROD (Vercel) : Il utilisera la variable d'environnement VITE_API_URL
-    // 2. En LOCAL : Il utilisera http://127.0.0.1:8000 (Le port par défaut de Django)
-    baseURL: import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000', 
-    
+    // BACKEND (local ou prod)
+    baseURL: import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api',
+
     headers: {
         'Content-Type': 'application/json',
-        // Django a parfois besoin de ça pour accepter les requêtes JSON
-        'Accept': 'application/json', 
+        'Accept': 'application/json',
     },
-    // Important pour que les cookies/sessions passent si besoin (optionnel avec JWT pur mais recommandé)
-    withCredentials: true 
+
+    // ❌ IMPORTANT : avec JWT on NE DOIT PAS envoyer de cookies
+    withCredentials: false,
 });
 
-// --- L'INTERCEPTEUR : GESTION DU TOKEN ---
+// =========================
+// INTERCEPTEUR JWT
+// =========================
 client.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('token');
+
+        // ✅ On ajoute Authorization SEULEMENT si le token existe
         if (token) {
-            // Django SimpleJWT attend souvent "Bearer <token>"
             config.headers.Authorization = `Bearer ${token}`;
+        } else {
+            // 🔥 TRÈS IMPORTANT
+            // Supprimer Authorization si absent (évite 403 sur routes publiques)
+            delete config.headers.Authorization;
         }
+
         return config;
     },
     (error) => Promise.reject(error)
 );
 
-// --- GESTION DES ERREURS ---
+// =========================
+// GESTION DES ERREURS
+// =========================
 client.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response && error.response.status === 401) {
-            // Token expiré ou invalide
             localStorage.removeItem('token');
             localStorage.removeItem('user');
-            
-            // On redirige vers le login uniquement si on n'y est pas déjà
+
             if (window.location.pathname !== '/login') {
                 window.location.href = '/login';
             }
