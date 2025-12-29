@@ -42,6 +42,8 @@ const Navbar = () => {
         setIsMenuOpen(false);
     }
   };
+  console.log("User connecté :", user);
+  console.log("Est Admin ?", user?.is_admin);
 
   return (
     <nav className="bg-bahri-blue text-white shadow-lg sticky top-0 z-50 font-sans">
