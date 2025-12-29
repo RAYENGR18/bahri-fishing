@@ -376,58 +376,106 @@ const AdminDashboard = () => {
 
             {/* MODAL DETAILS COMMANDE */}
             {selectedOrder && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
                     <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 relative max-h-[90vh] overflow-y-auto">
-                        <button onClick={() => setSelectedOrder(null)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><XCircle size={24}/></button>
-                        <h2 className="text-2xl font-bold mb-6 text-gray-800">Commande #{selectedOrder.id.slice(-6)}</h2>
-                        {/* ... Détails de la commande (inchangé) ... */}
-                         {/* Pour alléger le code ici, je garde ton code existant pour l'affichage des items */}
-                         <div className="space-y-4">
-                            <p><strong>Client:</strong> {selectedOrder.client_name}</p>
-                            <p><strong>Total:</strong> {selectedOrder.total_amount} TND</p>
-                            {/* Tu peux remettre ici ton tableau d'items existant */}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-                        {/* 👇 C'EST ICI QUE J'AVAIS SUPPRIMÉ LA LISTE, JE LA REMETS 👇 */}
-                        <h3 className="font-bold text-gray-800 mb-3">Articles commandés</h3>
-                        <div className="border rounded-lg overflow-hidden">
-                            <table className="w-full text-left text-sm">
-                                <thead className="bg-gray-100 text-gray-600 uppercase">
-                                    <tr>
-                                        <th className="px-4 py-3">Produit</th>
-                                        <th className="px-4 py-3 text-center">Qté</th>
-                                        <th className="px-4 py-3 text-right">Prix</th>
-                                        <th className="px-4 py-3 text-right">Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {selectedOrder.items && selectedOrder.items.map((item, idx) => (
-                                        <tr key={idx} className="hover:bg-gray-50">
-                                            <td className="px-4 py-3 font-medium text-gray-800">{item.title}</td>
-                                            <td className="px-4 py-3 text-center bg-gray-50 font-mono">x{item.quantity}</td>
-                                            <td className="px-4 py-3 text-right text-gray-600">{item.price} TND</td>
-                                            <td className="px-4 py-3 text-right font-bold text-bahri-blue">
-                                                {(item.price * item.quantity).toFixed(2)} TND
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                        {/* 👆 FIN DE LA LISTE RESTAURÉE 👆 */}
+                        <button onClick={() => setSelectedOrder(null)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                            <XCircle size={24}/>
+                        </button>
                         
+                        <h2 className="text-2xl font-bold mb-6 text-gray-800 border-b pb-2">
+                            Commande #{selectedOrder.id.slice(-6)}
+                        </h2>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            {/* Infos Client */}
+                            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                                <h3 className="text-xs font-bold text-blue-500 uppercase mb-3 flex items-center gap-2">
+                                    <Users size={14}/> Client
+                                </h3>
+                                <p className="font-bold text-gray-800 text-lg">{selectedOrder.client_name}</p>
+                                <p className="text-gray-600 text-sm mt-1">{selectedOrder.email}</p>
+                                <p className="text-gray-600 text-sm">{selectedOrder.phone || "Pas de téléphone"}</p>
+                            </div>
+
+                            {/* Infos Livraison */}
+                            <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-100">
+                                <h3 className="text-xs font-bold text-yellow-600 uppercase mb-3 flex items-center gap-2">
+                                    <Truck size={14}/> Livraison
+                                </h3>
+                                <p className="text-gray-800">{selectedOrder.address}</p>
+                                <p className="text-gray-800 font-medium">{selectedOrder.city}</p>
+                            </div>
+                        </div>
+
+                        {/* Liste Produits */}
+                        <div className="mb-6">
+                            <h3 className="text-xs font-bold text-gray-500 uppercase mb-3 flex items-center gap-2">
+                                <ShoppingBag size={14}/> Contenu du colis ({selectedOrder.items ? selectedOrder.items.length : 0})
+                            </h3>
+                            
+                            <div className="bg-white border rounded-lg overflow-hidden">
+                                {selectedOrder.items && selectedOrder.items.length > 0 ? (
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="bg-gray-100 text-gray-600 font-bold">
+                                            <tr>
+                                                <th className="p-3">Produit</th>
+                                                <th className="p-3 text-center">Prix U.</th>
+                                                <th className="p-3 text-center">Qté</th>
+                                                <th className="p-3 text-right">Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {selectedOrder.items.map((item, index) => (
+                                                <tr key={index} className="hover:bg-gray-50">
+                                                    <td className="p-3 text-gray-800 flex items-center gap-3">
+                                                        {/* Image miniature */}
+                                                        <div className="w-10 h-10 bg-gray-200 rounded overflow-hidden flex-shrink-0 border">
+                                                            {item.image ? (
+                                                                <img 
+                                                                    src={item.image.startsWith('http') ? item.image : `http://127.0.0.1:8000${item.image}`} 
+                                                                    alt="" 
+                                                                    className="w-full h-full object-cover"
+                                                                />
+                                                            ) : (
+                                                                <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                                                    <Package size={16}/>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <span className="font-medium">{item.title}</span>
+                                                    </td>
+                                                    <td className="p-3 text-center text-gray-500">{item.price} TND</td>
+                                                    <td className="p-3 text-center font-bold bg-gray-50">x{item.quantity}</td>
+                                                    <td className="p-3 text-right font-bold text-bahri-blue">{item.total} TND</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                ) : (
+                                    <div className="p-8 text-center text-gray-500 flex flex-col items-center">
+                                        <Package size={40} className="mb-2 text-gray-300"/>
+                                        <p>Détails produits non disponibles.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Total Final */}
+                        <div className="flex justify-end border-t pt-4">
+                            <div className="text-right">
+                                <p className="text-gray-500 text-sm">Total Commande</p>
+                                <p className="text-3xl font-bold text-bahri-blue">{selectedOrder.total_amount} <span className="text-lg">TND</span></p>
+                            </div>
+                        </div>
+
                         <div className="mt-6 flex justify-end">
-                             <button onClick={() => setSelectedOrder(null)} className="bg-gray-200 text-gray-800 px-6 py-2 rounded-lg font-bold hover:bg-gray-300 transition">
+                            <button onClick={() => setSelectedOrder(null)} className="bg-gray-100 text-gray-700 px-6 py-2 rounded-lg font-bold hover:bg-gray-200 transition">
                                 Fermer
-                             </button>
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
-
             {/* MODAL GESTION UTILISATEUR (NOUVEAU) */}
             {showUserModal && selectedUser && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
