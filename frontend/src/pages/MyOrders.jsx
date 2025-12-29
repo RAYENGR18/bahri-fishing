@@ -108,17 +108,28 @@ const MyOrders = () => {
                             </div>
                             <div className="p-6">
                                 <div className="space-y-4">
-                                    {order.items && order.items.map((item, idx) => (
-                                        <div key={idx} className="flex justify-between items-center text-sm">
-                                            <div className="flex items-center gap-3">
-                                                <div className="bg-gray-100 w-10 h-10 rounded flex items-center justify-center text-gray-400 font-bold text-xs">
-                                                    x{item.quantity}
-                                                </div>
-                                                <span className="font-medium text-gray-800">{item.title}</span>
-                                            </div>
-                                            <span className="text-gray-600">{item.price} TND</span>
-                                        </div>
-                                    ))}
+                                    {order.items && order.items.map((item, idx) =>  (
+                                            <tr key={index} className="hover:bg-gray-50">
+                                            <td className="p-3 text-gray-800 flex items-center gap-3">
+                                            {/* Image miniature */}
+                                            <div className="w-10 h-10 bg-gray-200 rounded overflow-hidden flex-shrink-0 border">
+                                                {item.image ? (<img 
+                                                                    src={item.image.startsWith('http') ? item.image : `http://127.0.0.1:8000${item.image}`} 
+                                                                            alt="" 
+                                                                            className="w-full h-full object-cover"
+                                                                 />
+                                                                ) : (<div className="w-full h-full flex items-center justify-center text-gray-400">
+                                                                    <Package size={16}/>
+                                                                    </div>
+                                                                     )}
+                                                                    </div>
+                                                                    <span className="font-medium">{item.title}</span>
+                                                                    </td>
+                                                                    <td className="p-3 text-center text-gray-500">{item.price} TND</td>
+                                                                    <td className="p-3 text-center font-bold bg-gray-50">x{item.quantity}</td>
+                                                                    <td className="p-3 text-right font-bold text-bahri-blue">{item.total} TND</td>
+                                            </tr>
+                                                        ))}
                                 </div>
                             </div>
                         </div>
