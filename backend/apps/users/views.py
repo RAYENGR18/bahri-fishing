@@ -1,7 +1,6 @@
 import os
 import random
 import secrets
-import string
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -17,6 +16,106 @@ from google.auth.transport import requests as google_requests
 from .serializers import RegisterSerializer, LoginSerializer, UserSerializer, UpdateProfileSerializer
 from .models import User, PasswordResetCode
 from .authentication import generate_tokens, JWTAuthentication
+
+@method_decorator(csrf_exempt, name='dispatch')
+class GoogleLoginView(APIView):
+    """
+    Gère l'inscription ET la connexion via Google
+    CSRF exempt car Google Identity Services utilise son propre système de sécurité
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        # 🔥 CORRECTION : Google envoie 'credential', pas 'token'
+        token = request.data.get('credential')
+        
+        if not token:
+            return Response(
+                {"error": "Token Google manquant"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Récupération du CLIENT_ID depuis les variables d'environnement
+            CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
+            
+            if not CLIENT_ID:
+                return Response(
+                    {"error": "Configuration Google OAuth manquante"}, 
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+            
+            # Vérification du token Google
+            id_info = id_token.verify_oauth2_token(
+                token, 
+                google_requests.Request(), 
+                CLIENT_ID
+            )
+
+            # Extraction des informations utilisateur
+            email = id_info.get('email')
+            first_name = id_info.get('given_name', 'Utilisateur')
+            last_name = id_info.get('family_name', '')
+            
+            if not email:
+                return Response(
+                    {"error": "Email non fourni par Google"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Recherche de l'utilisateur existant
+            user = User.objects(email=email).first()
+
+            if user:
+                # CAS 1 : CONNEXION (utilisateur existe déjà)
+                tokens = generate_tokens(user)
+                return Response({
+                    "user": UserSerializer(user).data,
+                    "tokens": tokens
+                }, status=status.HTTP_200_OK)
+            
+            else:
+                # CAS 2 : INSCRIPTION (nouvel utilisateur)
+                # Génération d'un mot de passe aléatoire sécurisé
+                random_password = secrets.token_urlsafe(16)
+
+                # Création du nouvel utilisateur
+                new_user = User(
+                    email=email,
+                    first_name=first_name,
+                    last_name=last_name,
+                    phone="Non renseigné",
+                    address="Non renseigné",
+                    city="Non renseigné",
+                    is_active=True
+                )
+                
+                new_user.set_password(random_password)
+                new_user.save()
+
+                # Génération des tokens
+                tokens = generate_tokens(new_user)
+                
+                return Response({
+                    "user": UserSerializer(new_user).data,
+                    "tokens": tokens
+                }, status=status.HTTP_201_CREATED)
+
+        except ValueError as e:
+            # Token invalide ou expiré
+            print(f"❌ Erreur validation token Google : {e}")
+            return Response(
+                {"error": "Token Google invalide ou expiré"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        except Exception as e:
+            # Erreur inattendue
+            print(f"❌ Erreur Google Login : {e}")
+            return Response(
+                {"error": f"Erreur serveur : {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 # =================================================================
 # 1. INSCRIPTION & CONNEXION CLASSIQUE
@@ -58,69 +157,6 @@ class LoginView(APIView):
             
             return Response({"error": "Identifiants invalides"}, status=status.HTTP_401_UNAUTHORIZED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-# =================================================================
-# 2. GOOGLE LOGIN (🔥 CORRIGÉ)
-# =================================================================
-
-@method_decorator(csrf_exempt, name='dispatch')
-class GoogleLoginView(APIView):
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        # 🔥 CORRECTION : Google envoie 'credential'
-        token = request.data.get('credential')
-        
-        if not token:
-            return Response({"error": "Token manquant"}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
-            
-            id_info = id_token.verify_oauth2_token(
-                token, 
-                google_requests.Request(), 
-                CLIENT_ID
-            )
-
-            email = id_info['email']
-            first_name = id_info.get('given_name', 'Utilisateur')
-            last_name = id_info.get('family_name', '')
-
-            user = User.objects(email=email).first()
-
-            if user:
-                tokens = generate_tokens(user)
-                return Response({
-                    "user": UserSerializer(user).data,
-                    "tokens": tokens
-                }, status=status.HTTP_200_OK)
-            
-            random_password = secrets.token_urlsafe(16)
-            new_user = User(
-                email=email,
-                first_name=first_name,
-                last_name=last_name,
-                phone="Non renseigné",
-                address="Non renseigné",
-                city="Non renseigné",
-                is_active=True
-            )
-            new_user.set_password(random_password)
-            new_user.save()
-
-            tokens = generate_tokens(new_user)
-            return Response({
-                "user": UserSerializer(new_user).data,
-                "tokens": tokens
-            }, status=status.HTTP_201_CREATED)
-
-        except ValueError:
-            return Response({"error": "Token Google invalide"}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            print(f"❌ Erreur Google : {e}")
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # =================================================================
