@@ -51,26 +51,20 @@ class GoogleLoginView(APIView):
             first_name = id_info.get('given_name', 'Utilisateur')
             last_name = id_info.get('family_name', '')
             
-            # 3. RECHERCHE INTELLIGENTE (C'est ici que la magie opère)
-            # On cherche par email, peu importe comment le compte a été créé au début
+            # 3. RECHERCHE INTELLIGENTE
             user = User.objects(email=email).first()
 
             if user:
-                # --- SCÉNARIO FUSION : Le compte existe déjà (créé par mot de passe ou Google) ---
+                # --- SCÉNARIO FUSION ---
                 print(f"🔄 Fusion de compte pour : {email}")
-                
-                # On met à jour les infos Google si elles manquent (Liaison du compte)
                 updated = False
                 
-                # Si l'utilisateur n'avait pas de Google ID (compte manuel), on l'ajoute !
                 if not user.google_id:
                     user.google_id = google_id
-                    # On change le provider pour dire qu'il supporte maintenant Google aussi
                     if user.auth_provider == 'email':
                         user.auth_provider = 'email_and_google' 
                     updated = True
                 
-                # On met à jour l'avatar si l'utilisateur n'en avait pas
                 if not user.avatar:
                     user.avatar = avatar
                     updated = True
@@ -78,7 +72,6 @@ class GoogleLoginView(APIView):
                 if updated:
                     user.save()
 
-                # On connecte l'utilisateur
                 tokens = generate_tokens(user)
                 return Response({
                     "message": "Connexion réussie (Comptes liés)",
@@ -87,10 +80,8 @@ class GoogleLoginView(APIView):
                 }, status=status.HTTP_200_OK)
             
             else:
-                # --- SCÉNARIO INSCRIPTION : Nouvel utilisateur ---
+                # --- SCÉNARIO INSCRIPTION ---
                 print(f"✨ Création nouveau compte Google pour : {email}")
-                
-                # On génère un mot de passe aléatoire (car Django en a besoin, même si pas utilisé)
                 random_password = secrets.token_urlsafe(16)
 
                 new_user = User(
@@ -99,7 +90,7 @@ class GoogleLoginView(APIView):
                     last_name=last_name,
                     google_id=google_id,
                     avatar=avatar,
-                    auth_provider="google", # Origine principale
+                    auth_provider="google",
                     points=0,
                     is_active=True
                 )
@@ -121,31 +112,23 @@ class GoogleLoginView(APIView):
             return Response({"error": "Erreur serveur lors de la connexion"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # =================================================================
-# 2. ADMINISTRATION (POUR TON DASHBOARD) - NOUVEAU 🚨
+# 2. ADMINISTRATION (POUR TON DASHBOARD)
 # =================================================================
 
 class AdminUserListView(APIView):
-    """
-    GET: Liste tous les utilisateurs
-    POST: Créer un utilisateur manuellement (Admin)
-    """
-    permission_classes = [AllowAny] # TEMPORAIRE (Mets IsAdminUser plus tard)
+    permission_classes = [AllowAny] 
 
     def get(self, request):
         users = User.objects.all().order_by('-date_joined')
         serializer = AdminUserSerializer(users, many=True)
         return Response(serializer.data)
 
-    # 👇 AJOUT DE LA MÉTHODE POST POUR CRÉER UN USER 👇
     def post(self, request):
         data = request.data
-        
-        # Vérif si email existe
         if User.objects(email=data.get('email')).first():
             return Response({"error": "Cet email existe déjà"}, status=400)
 
         try:
-            # Création
             user = User(
                 email=data['email'],
                 first_name=data.get('first_name', ''),
@@ -157,7 +140,6 @@ class AdminUserListView(APIView):
                 auth_provider='email',
                 is_active=True
             )
-            # Mot de passe obligatoire pour création manuelle
             if not data.get('password'):
                 return Response({"error": "Mot de passe requis"}, status=400)
                 
@@ -169,12 +151,7 @@ class AdminUserListView(APIView):
             return Response({"error": str(e)}, status=500)
 
 class AdminUserDetailView(APIView):
-    """
-    GET: Voir l'historique des points d'un user
-    PATCH: Modifier les points d'un user
-    """
-    # permission_classes = [IsAuthenticated, IsAdminUser] # Active ça pour sécuriser
-    permission_classes = [AllowAny] # TEMPORAIRE pour tes tests
+    permission_classes = [AllowAny]
 
     def get(self, request, user_id):
         user = User.objects(id=user_id).first()
@@ -191,25 +168,20 @@ class AdminUserDetailView(APIView):
             return Response({"error": "Utilisateur introuvable"}, status=404)
 
         try:
-            # On attend { points: 150, reason: "Geste commercial" }
             new_points = int(request.data.get('points'))
             reason = request.data.get('reason', 'Modification Admin')
             
-            # Calcul de la différence
             old_points = user.points
             diff = new_points - old_points
             
             if diff == 0:
                 return Response({"message": "Aucun changement de points détecté"}, status=200)
 
-            # Mise à jour
             user.points = new_points
             user.save()
 
-            # Création de l'historique
             PointsHistory(
                 user=user,
-                # admin=request.user if request.user.is_authenticated else None,
                 action="Correction Admin",
                 amount=diff,
                 reason=reason
@@ -230,6 +202,8 @@ class AdminUserDetailView(APIView):
 # 3. AUTHENTIFICATION CLASSIQUE (Email/Password)
 # =================================================================
 
+# 👇👇👇 ICI, J'AI AJOUTÉ LE DÉCORATEUR IMPORTANT 👇👇👇
+@method_decorator(csrf_exempt, name='dispatch') 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
     
@@ -245,7 +219,8 @@ class RegisterView(APIView):
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
+# 👇👇👇 ET SURTOUT ICI POUR LE LOGIN 👇👇👇
+@method_decorator(csrf_exempt, name='dispatch')
 class LoginView(APIView):
     permission_classes = [AllowAny]
     
@@ -298,9 +273,10 @@ class ProfileUpdateView(APIView):
 
 
 # =================================================================
-# 5. MOT DE PASSE OUBLIÉ (Inchangé)
+# 5. MOT DE PASSE OUBLIÉ
 # =================================================================
 
+@method_decorator(csrf_exempt, name='dispatch') # Ajouté aussi ici par sécurité
 class ForgotPasswordView(APIView):
     permission_classes = [AllowAny]
     
@@ -309,8 +285,6 @@ class ForgotPasswordView(APIView):
         user = User.objects(email=email).first()
         
         if not user:
-            # Par sécurité, on peut renvoyer 200 même si l'email n'existe pas
-            # Mais pour le debug, on laisse 404 si tu préfères
             return Response({"error": "Aucun utilisateur trouvé"}, status=status.HTTP_404_NOT_FOUND)
 
         code = str(random.randint(100000, 999999))
@@ -330,7 +304,7 @@ class ForgotPasswordView(APIView):
 
         return Response({"message": "Code envoyé à votre adresse email"}, status=status.HTTP_200_OK)
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class VerifyCodeView(APIView):
     permission_classes = [AllowAny]
     
@@ -352,7 +326,7 @@ class VerifyCodeView(APIView):
 
         return Response({"message": "Code valide"}, status=status.HTTP_200_OK)
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class ResetPasswordView(APIView):
     permission_classes = [AllowAny]
     
