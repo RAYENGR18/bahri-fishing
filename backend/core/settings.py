@@ -102,7 +102,7 @@ CSRF_TRUSTED_ORIGINS = [
     "https://bahri-backend.vercel.app",
 ]
 
-CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_CREDENTIALS = False
 # Autoriser les headers envoyés par Axios et Google
 CORS_ALLOW_HEADERS = [
     'accept',
