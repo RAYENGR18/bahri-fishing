@@ -2,50 +2,43 @@ import React, { useEffect, useState, useContext } from 'react';
 import client from '../api/client';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Package, Clock, CheckCircle, Truck, XCircle } from 'lucide-react';
+import { Package, Clock, CheckCircle, Truck, XCircle, ImageOff } from 'lucide-react';
 
 const MyOrders = () => {
-    // On récupère refreshUser du contexte
     const { user, loading, refreshUser } = useContext(AuthContext);
     const navigate = useNavigate();
     const [orders, setOrders] = useState([]); 
     const [isLoadingData, setIsLoadingData] = useState(true);
 
-     // 1. Effet de Sécurité : Rediriger si pas connecté
+    // Si tu utilises Cloudinary, cette URL de base ne servira que pour les images locales de secours
+    const API_URL = "http://127.0.0.1:8000"; 
+
     useEffect(() => {
         if (!loading && !user) {
             navigate('/login');
         }
     }, [user, loading, navigate]);
 
-    // 2. Effet de Chargement : On charge les données UNE SEULE FOIS
     useEffect(() => {
         if (user) {
             fetchMyOrders();
-            // On met à jour les points une seule fois au chargement du composant
             refreshUser();
         }
-        // 👇 LE SECRET EST ICI : Tableau vide [] = "Exécute-toi une seule fois au montage"
-        // On retire 'user' et 'refreshUser' d'ici pour casser la boucle infinie.
     }, []);
 
     const fetchMyOrders = async () => {
         try {
             const token = localStorage.getItem('token'); 
-            
             if (!token) {
                 setIsLoadingData(false);
                 return;
             }
 
-            const config = {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            };
-
-            const res = await client.get('/orders/my-orders/', config);
+            const res = await client.get('/orders/my-orders/', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             
+            // Sécurité : On s'assure que c'est bien un tableau
             if (Array.isArray(res.data)) {
                 setOrders(res.data);
             } else {
@@ -60,7 +53,6 @@ const MyOrders = () => {
         }
     };
 
-    // ... (Le reste de votre code : getStatusBadge et le return ne changent pas)
     const getStatusBadge = (status) => {
         switch (status) {
             case 'PENDING': return <span className="flex items-center gap-1 text-yellow-600 bg-yellow-50 px-3 py-1 rounded-full text-xs font-bold"><Clock size={14}/> En Attente</span>;
@@ -71,10 +63,26 @@ const MyOrders = () => {
         }
     };
 
-    if (loading || isLoadingData) return <div className="p-10 text-center">Chargement de vos commandes...</div>;
+    // --- FONCTION CORRIGÉE POUR CLOUDINARY ---
+    const getImageUrl = (item) => {
+        // On essaie plusieurs propriétés au cas où le serializer changerait de nom
+        const imagePath = item.image || item.product_image || item.product?.image;
+
+        if (!imagePath) return null;
+        
+        // Si c'est déjà une URL complète (Cloudinary), on la retourne telle quelle
+        if (imagePath.startsWith('http') || imagePath.startsWith('https')) {
+            return imagePath;
+        }
+        
+        // Sinon, c'est une image locale, on ajoute l'URL de l'API
+        return `${API_URL}${imagePath}`;
+    };
+
+    if (loading || isLoadingData) return <div className="p-10 text-center text-gray-500 font-medium">Chargement de vos commandes...</div>;
 
     return (
-        <div className="max-w-4xl mx-auto px-4 py-10">
+        <div className="max-w-4xl mx-auto px-4 py-10 min-h-screen">
             <h1 className="text-3xl font-bold text-gray-800 mb-2">Mes Commandes</h1>
             <p className="text-gray-500 mb-8">Suivez l'état de vos achats récents.</p>
 
@@ -91,15 +99,15 @@ const MyOrders = () => {
                 <div className="space-y-6">
                     {orders.map((order) => (
                         <div key={order.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition">
-                             {/* ... Le reste de votre code d'affichage ... */}
-                             <div className="bg-gray-50 px-6 py-4 flex flex-wrap justify-between items-center border-b border-gray-200 gap-4">
+                            {/* En-tête de la commande */}
+                            <div className="bg-gray-50 px-6 py-4 flex flex-wrap justify-between items-center border-b border-gray-200 gap-4">
                                 <div>
                                     <p className="text-xs text-gray-500 uppercase font-bold">Commande n°</p>
-                                    <p className="font-mono text-gray-800">#{order.id ? order.id.toString().slice(-6) : 'N/A'}</p>
+                                    <p className="font-mono text-gray-800 font-bold">#{order.id ? order.id.toString().slice(-6) : 'N/A'}</p>
                                 </div>
                                 <div>
                                     <p className="text-xs text-gray-500 uppercase font-bold">Date</p>
-                                    <p className="text-sm text-gray-800">{new Date(order.created_at).toLocaleDateString()}</p>
+                                    <p className="text-sm text-gray-800 font-medium">{new Date(order.created_at).toLocaleDateString()}</p>
                                 </div>
                                 <div>
                                     <p className="text-xs text-gray-500 uppercase font-bold">Total</p>
@@ -109,17 +117,46 @@ const MyOrders = () => {
                                     {getStatusBadge(order.status)}
                                 </div>
                             </div>
-                            <div className="p-6">
+                            
+                            {/* Liste des produits */}
+                            <div className="p-6 bg-white">
                                 <div className="space-y-4">
                                     {order.items && order.items.map((item, idx) => (
-                                        <div key={idx} className="flex justify-between items-center text-sm">
-                                            <div className="flex items-center gap-3">
-                                                <div className="bg-gray-100 w-10 h-10 rounded flex items-center justify-center text-gray-400 font-bold text-xs">
-                                                    x{item.quantity}
+                                        <div key={idx} className="flex justify-between items-center text-sm border-b border-gray-50 pb-3 last:border-0 last:pb-0">
+                                            <div className="flex items-center gap-4">
+                                                
+                                                {/* --- BLOC IMAGE CORRIGÉ --- */}
+                                                <div className="relative w-16 h-16 shrink-0 bg-gray-50 rounded-lg border border-gray-100 overflow-hidden">
+                                                    {getImageUrl(item) ? (
+                                                        <img 
+                                                            src={getImageUrl(item)} 
+                                                            alt={item.title} 
+                                                            className="w-full h-full object-cover"
+                                                            onError={(e) => {
+                                                                e.target.onerror = null; 
+                                                                e.target.src = "https://via.placeholder.com/64?text=No+Img"; // Fallback ultime
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center text-gray-300">
+                                                            <ImageOff size={24} />
+                                                        </div>
+                                                    )}
+                                                    {/* Badge quantité */}
+                                                    <span className="absolute bottom-0 right-0 bg-gray-800 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-tl-md">
+                                                        x{item.quantity}
+                                                    </span>
                                                 </div>
-                                                <span className="font-medium text-gray-800">{item.title}</span>
+                                                {/* ------------------------- */}
+
+                                                <div className="flex flex-col">
+                                                    <span className="font-bold text-gray-800 text-base">{item.title}</span>
+                                                    <span className="text-xs text-gray-500">Réf: {item.product_id || "STD"}</span>
+                                                </div>
                                             </div>
-                                            <span className="text-gray-600">{item.price} TND</span>
+                                            <span className="text-gray-700 font-bold whitespace-nowrap bg-gray-50 px-3 py-1 rounded-lg">
+                                                {item.price} TND
+                                            </span>
                                         </div>
                                     ))}
                                 </div>
