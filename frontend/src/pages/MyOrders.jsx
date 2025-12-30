@@ -124,7 +124,7 @@ const MyOrders = () => {
                                                                                                                 </div>
                                                                                                             )}
                                                                                                         </div>
-                                                <div className="bg-gray-100 w-10 h-10 rounded flex items-center justify-center text-gray-400 font-bold text-xs">
+                                                <div className="*text-gray-400 ">
                                                     x{item.quantity}
                                                 </div>
                                                 <span className="font-medium text-gray-800">{item.title}</span>
