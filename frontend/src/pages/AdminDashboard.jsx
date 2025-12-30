@@ -5,7 +5,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { 
     Package, Users, DollarSign, ShoppingBag, 
     CheckCircle, XCircle, Truck, Eye, Trash2, Plus, List,
-    UserPlus, History, Save
+    UserPlus, History, Save, Search, Calendar, AlertCircle, X
 } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
 
@@ -18,6 +18,17 @@ const AdminDashboard = () => {
     const [stats, setStats] = useState(null);
     const [refresh, setRefresh] = useState(0);
 
+    // --- SYSTÈME DE NOTIFICATION (NOUVEAU) ---
+    const [notification, setNotification] = useState(null); // { type: 'success' | 'error', message: '' }
+
+    const showNotification = (type, message) => {
+        setNotification({ type, message });
+        // Cacher automatiquement après 3 secondes
+        setTimeout(() => {
+            setNotification(null);
+        }, 3000);
+    };
+
     // --- ÉTATS COMMANDES ---
     const [orders, setOrders] = useState([]);
     const [selectedOrder, setSelectedOrder] = useState(null);
@@ -25,9 +36,14 @@ const AdminDashboard = () => {
         isOpen: false, title: '', message: '', isDanger: false, action: null
     });
 
-    // --- ÉTATS UTILISATEURS (NOUVEAU) ---
+    // --- FILTRES COMMANDES (NOUVEAU) ---
+    const [searchTerm, setSearchTerm] = useState('');
+    const [dateStart, setDateStart] = useState('');
+    const [dateEnd, setDateEnd] = useState('');
+
+    // --- ÉTATS UTILISATEURS ---
     const [usersList, setUsersList] = useState([]);
-    const [selectedUser, setSelectedUser] = useState(null); // Pour le modal de gestion
+    const [selectedUser, setSelectedUser] = useState(null); 
     const [userHistory, setUserHistory] = useState([]);
     const [showUserModal, setShowUserModal] = useState(false);
     const [showAddUserModal, setShowAddUserModal] = useState(false);
@@ -53,19 +69,18 @@ const AdminDashboard = () => {
 
     const fetchStatsAndOrders = async () => {
         try {
-            const statsRes = await client.get('/admin/stats/'); // Assure-toi que cette route existe
+            const statsRes = await client.get('/admin/stats/');
             setStats(statsRes.data);
-            const ordersRes = await client.get('/admin/orders/'); // Assure-toi que cette route existe
+            const ordersRes = await client.get('/admin/orders/');
             setOrders(ordersRes.data);
         } catch (err) {
             console.error("Erreur stats/orders", err);
+            showNotification('error', "Impossible de charger les commandes.");
         }
     };
 
     const fetchUsers = async () => {
         try {
-            // Note: l'URL dépend de ton urls.py backend. 
-            // Si c'est dans apps/users/urls.py préfixé par /users/, c'est /users/admin/users/
             const res = await client.get('/users/admin/users/');
             setUsersList(res.data);
         } catch (err) {
@@ -73,18 +88,53 @@ const AdminDashboard = () => {
         }
     };
 
+    // --- LOGIQUE DE FILTRAGE COMMANDES (NOUVEAU) ---
+    const getFilteredOrders = () => {
+        return orders.filter(order => {
+            // 1. Recherche Textuelle (ID, Nom, Email, Tel)
+            const searchLower = searchTerm.toLowerCase();
+            const matchText = 
+                (order.id && order.id.toString().toLowerCase().includes(searchLower)) ||
+                (order.client_name && order.client_name.toLowerCase().includes(searchLower)) ||
+                (order.email && order.email.toLowerCase().includes(searchLower)) ||
+                (order.phone && order.phone.includes(searchLower));
+
+            // 2. Filtre par Date
+            // On suppose que l'objet order a un champ 'created_at' ou 'date'. 
+            // Adapte 'created_at' si ton backend renvoie un autre nom (ex: date_placed)
+            let matchDate = true;
+            if (dateStart || dateEnd) {
+                const orderDate = new Date(order.created_at); 
+                orderDate.setHours(0,0,0,0); // Ignorer l'heure pour la comparaison
+                
+                if (dateStart) {
+                    const start = new Date(dateStart);
+                    if (orderDate < start) matchDate = false;
+                }
+                if (dateEnd) {
+                    const end = new Date(dateEnd);
+                    if (orderDate > end) matchDate = false;
+                }
+            }
+
+            return matchText && matchDate;
+        });
+    };
+
     const requestStatusChange = (orderId, newStatus) => {
         setConfirmModal({
             isOpen: true,
             title: "Changer le statut",
-            message: `Voulez-vous vraiment passer cette commande en "${newStatus}" ? Les points de fidélité seront mis à jour si applicable.`,
+            message: `Voulez-vous vraiment passer cette commande en "${newStatus}" ?`,
             isDanger: newStatus === 'CANCELLED',
             action: async () => {
                 try {
                     await client.post(`/admin/orders/${orderId}/update/`, { status: newStatus });
+                    showNotification('success', `Commande mise à jour : ${newStatus}`);
                     setRefresh(prev => prev + 1);
                 } catch (err) {
                     console.error("Erreur update", err);
+                    showNotification('error', "Erreur lors de la mise à jour.");
                 }
             }
         });
@@ -94,14 +144,16 @@ const AdminDashboard = () => {
         setConfirmModal({
             isOpen: true,
             title: "Supprimer la commande",
-            message: "⚠️ Attention : Cette action est irréversible. Voulez-vous vraiment supprimer cette commande définitivement ?",
+            message: "⚠️ Action irréversible. Supprimer définitivement ?",
             isDanger: true,
             action: async () => {
                 try {
                     await client.delete(`/admin/orders/${orderId}/delete/`);
+                    showNotification('success', "Commande supprimée avec succès.");
                     setRefresh(prev => prev + 1);
                 } catch (err) {
                     console.error("Erreur suppression", err);
+                    showNotification('error', "Erreur lors de la suppression.");
                 }
             }
         });
@@ -109,7 +161,6 @@ const AdminDashboard = () => {
 
     // --- LOGIQUE UTILISATEURS ---
     
-    // 1. Ouvrir le modal de gestion (Historique + Points)
     const handleManageUser = async (user) => {
         setSelectedUser(user);
         setPointsData({ points: user.points, reason: "" });
@@ -119,50 +170,51 @@ const AdminDashboard = () => {
             setShowUserModal(true);
         } catch (error) {
             console.error("Erreur historique", error);
+            showNotification('error', "Erreur chargement historique.");
         }
     };
 
-    // 2. Mettre à jour les points
+    // MODIFICATION ICI : Remplacement de alert() par showNotification()
     const handleUpdatePoints = async () => {
         try {
             await client.patch(`/users/admin/users/${selectedUser.id}/`, pointsData);
-            alert("Points mis à jour !");
+            showNotification('success', "Points mis à jour avec succès !");
             setShowUserModal(false);
-            setRefresh(prev => prev + 1); // Rafraîchir la liste
+            setRefresh(prev => prev + 1); 
         } catch (error) {
-            alert("Erreur lors de la mise à jour");
+            showNotification('error', "Erreur lors de la mise à jour des points.");
         }
     };
 
-    // 3. Créer un utilisateur manuellement
+    // MODIFICATION ICI : Remplacement de alert() par showNotification()
     const handleCreateUser = async (e) => {
         e.preventDefault();
         try {
             await client.post('/users/admin/users/', newUser);
-            alert("Utilisateur créé avec succès !");
+            showNotification('success', "Utilisateur créé avec succès !");
             setShowAddUserModal(false);
             setNewUser({ email: "", password: "", first_name: "", last_name: "", points: 0 });
             setRefresh(prev => prev + 1);
         } catch (error) {
-            alert(error.response?.data?.error || "Erreur création utilisateur");
+            showNotification('error', error.response?.data?.error || "Erreur création utilisateur");
         }
     };
 
-    // 4. Supprimer un utilisateur (NOUVELLE FONCTIONNALITÉ AJOUTÉE)
     const requestDeleteUser = (userId) => {
         setConfirmModal({
             isOpen: true,
             title: "Supprimer l'utilisateur",
-            message: "⚠️ Attention : Cette action est irréversible. L'utilisateur et toutes ses commandes seront définitivement supprimés.",
+            message: "⚠️ Attention : L'utilisateur et ses commandes seront supprimés.",
             isDanger: true,
             action: async () => {
                 try {
                     await client.delete(`/users/admin/users/${userId}/`);
-                    setRefresh(prev => prev + 1); // Rafraîchir la liste
+                    setRefresh(prev => prev + 1);
                     setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                    showNotification('success', "Utilisateur supprimé.");
                 } catch (err) {
                     console.error(err);
-                    alert("Erreur lors de la suppression de l'utilisateur");
+                    showNotification('error', "Erreur suppression utilisateur.");
                 }
             }
         });
@@ -171,10 +223,24 @@ const AdminDashboard = () => {
 
     if (!stats) return <div className="min-h-screen flex items-center justify-center text-bahri-blue font-bold">Chargement...</div>;
 
+    // Calcul des commandes filtrées pour l'affichage
+    const filteredOrders = getFilteredOrders();
+
     return (
         <div className="max-w-7xl mx-auto px-4 py-8 relative min-h-screen">
             
-            {/* Modal de Confirmation (Utilisé pour Commandes et Utilisateurs) */}
+            {/* --- COMPOSANT NOTIFICATION (TOAST) --- */}
+            {notification && (
+                <div className={`fixed top-4 right-4 z-[60] px-6 py-4 rounded-lg shadow-xl flex items-center gap-3 animate-fade-in text-white ${notification.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
+                    {notification.type === 'success' ? <CheckCircle size={24} /> : <AlertCircle size={24} />}
+                    <div>
+                        <p className="font-bold">{notification.type === 'success' ? 'Succès' : 'Erreur'}</p>
+                        <p className="text-sm opacity-90">{notification.message}</p>
+                    </div>
+                    <button onClick={() => setNotification(null)} className="ml-4 opacity-70 hover:opacity-100"><X size={18}/></button>
+                </div>
+            )}
+
             <ConfirmModal 
                 isOpen={confirmModal.isOpen}
                 onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
@@ -202,7 +268,7 @@ const AdminDashboard = () => {
                 </div>
             </div>
 
-            {/* --- STATS GLOBALES (Toujours visibles) --- */}
+            {/* --- STATS GLOBALES --- */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
                 <div className="bg-white p-6 rounded-xl shadow border-l-4 border-blue-500 flex justify-between items-center">
                     <div><p className="text-gray-500">Commandes</p><p className="text-2xl font-bold">{stats.total_orders}</p></div>
@@ -223,74 +289,131 @@ const AdminDashboard = () => {
             </div>
 
             {/* =========================================================================
-                                             ONGLET COMMANDES
+                                            ONGLET COMMANDES
                ========================================================================= */}
             {activeTab === 'orders' && (
                 <div className="animate-fade-in">
-                    {/* Actions Rapides Produits */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                        <Link to="/admin/products" className="bg-white p-6 rounded-xl shadow hover:shadow-md transition flex justify-between items-center group border border-gray-100">
-                            <div>
-                                <h3 className="text-xl font-bold text-gray-800 group-hover:text-bahri-blue">Gestion du Catalogue</h3>
-                                <p className="text-gray-500 text-sm">Gérer les produits et les stocks</p>
+                    
+                    {/* --- ACTIONS & FILTRES COMMANDES (NOUVEAU BLOC) --- */}
+                    <div className="bg-white p-4 rounded-xl shadow mb-6 border border-gray-100">
+                        <div className="flex flex-col md:flex-row gap-4 justify-between items-end">
+                            {/* Barre de Recherche */}
+                            <div className="flex-1 w-full">
+                                <label className="text-sm font-bold text-gray-600 mb-1 block">Rechercher</label>
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-2.5 text-gray-400" size={18}/>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Nom, ID, Email, ou Téléphone..." 
+                                        className="pl-10 pr-4 py-2 border rounded-lg w-full focus:ring-2 focus:ring-blue-100 outline-none"
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                    />
+                                </div>
                             </div>
-                            <div className="bg-blue-50 p-3 rounded-full group-hover:bg-blue-100"><List className="text-bahri-blue"/></div>
-                        </Link>
-                        <Link to="/admin/products/new" className="bg-white p-6 rounded-xl shadow hover:shadow-md transition flex justify-between items-center group border border-gray-100">
+                            
+                            {/* Filtre Date Début */}
                             <div>
-                                <h3 className="text-xl font-bold text-gray-800 group-hover:text-green-600">Ajouter un Produit</h3>
-                                <p className="text-gray-500 text-sm">Créer une nouvelle fiche article</p>
+                                <label className="text-sm font-bold text-gray-600 mb-1 block">Du</label>
+                                <div className="relative">
+                                    <Calendar className="absolute left-3 top-2.5 text-gray-400" size={18}/>
+                                    <input 
+                                        type="date" 
+                                        className="pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-100 outline-none"
+                                        value={dateStart}
+                                        onChange={(e) => setDateStart(e.target.value)}
+                                    />
+                                </div>
                             </div>
-                            <div className="bg-green-50 p-3 rounded-full group-hover:bg-green-100"><Plus className="text-green-600"/></div>
-                        </Link>
+
+                            {/* Filtre Date Fin */}
+                            <div>
+                                <label className="text-sm font-bold text-gray-600 mb-1 block">Au</label>
+                                <div className="relative">
+                                    <Calendar className="absolute left-3 top-2.5 text-gray-400" size={18}/>
+                                    <input 
+                                        type="date" 
+                                        className="pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-100 outline-none"
+                                        value={dateEnd}
+                                        onChange={(e) => setDateEnd(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Bouton Reset */}
+                            {(searchTerm || dateStart || dateEnd) && (
+                                <button 
+                                    onClick={() => { setSearchTerm(''); setDateStart(''); setDateEnd(''); }}
+                                    className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition font-medium"
+                                >
+                                    Réinitialiser
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     {/* Tableau Commandes */}
                     <div className="bg-white rounded-xl shadow overflow-hidden mb-10 border border-gray-100">
-                        <div className="px-6 py-4 border-b bg-gray-50"><h2 className="text-lg font-bold text-gray-700">Dernières Commandes</h2></div>
+                        <div className="px-6 py-4 border-b bg-gray-50 flex justify-between items-center">
+                            <h2 className="text-lg font-bold text-gray-700">Liste des Commandes</h2>
+                            <span className="text-sm text-gray-500 bg-white px-2 py-1 rounded border">{filteredOrders.length} résultat(s)</span>
+                        </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left">
                                 <thead className="bg-gray-50 text-gray-500 text-sm uppercase">
                                     <tr>
                                         <th className="px-6 py-3">ID</th>
                                         <th className="px-6 py-3">Client</th>
+                                        <th className="px-6 py-3">Date</th> 
                                         <th className="px-6 py-3">Total</th>
                                         <th className="px-6 py-3">Statut</th>
                                         <th className="px-6 py-3">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
-                                    {orders.map((order) => (
-                                        <tr key={order.id} className="hover:bg-gray-50 transition">
-                                            <td className="px-6 py-4 font-mono text-sm text-gray-600">#{order.id.slice(-6)}</td>
-                                            <td className="px-6 py-4">
-                                                <div className="font-bold text-gray-800">{order.client_name || "Invité"}</div>
-                                                <button onClick={() => setSelectedOrder(order)} className="text-xs text-bahri-blue hover:underline flex items-center gap-1 mt-1">
-                                                    <Eye size={12}/> Voir détails
-                                                </button>
-                                            </td>
-                                            <td className="px-6 py-4 font-bold">{order.total_amount} TND</td>
-                                            <td className="px-6 py-4">
-                                                <span className={`px-3 py-1 text-xs font-bold rounded-full 
-                                                    ${order.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' : 
-                                                    order.status === 'VALIDATED' ? 'bg-green-100 text-green-800' : 
-                                                    order.status === 'SHIPPED' ? 'bg-blue-100 text-blue-800' : 
-                                                    'bg-red-100 text-red-800'}`}>
-                                                    {order.status}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 flex items-center gap-2">
-                                                {/* Boutons d'action commandes (inchangés) */}
-                                                {order.status === 'PENDING' && (
-                                                    <button onClick={() => requestStatusChange(order.id, 'VALIDATED')} className="p-2 rounded bg-green-50 text-green-600 hover:bg-green-100"><CheckCircle size={18} /></button>
-                                                )}
-                                                {order.status === 'VALIDATED' && (
-                                                    <button onClick={() => requestStatusChange(order.id, 'SHIPPED')} className="p-2 rounded bg-blue-50 text-blue-600 hover:bg-blue-100"><Truck size={18} /></button>
-                                                )}
-                                                <button onClick={() => requestDelete(order.id)} className="p-2 rounded bg-red-50 text-red-600 hover:bg-red-100"><Trash2 size={18} /></button>
+                                    {filteredOrders.length > 0 ? (
+                                        filteredOrders.map((order) => (
+                                            <tr key={order.id} className="hover:bg-gray-50 transition">
+                                                <td className="px-6 py-4 font-mono text-sm text-gray-600">#{order.id.slice(0, 8)}...</td>
+                                                <td className="px-6 py-4">
+                                                    <div className="font-bold text-gray-800">{order.client_name || "Invité"}</div>
+                                                    <div className="text-xs text-gray-500">{order.email}</div>
+                                                    <div className="text-xs text-gray-500">{order.phone}</div>
+                                                    <button onClick={() => setSelectedOrder(order)} className="text-xs text-bahri-blue hover:underline flex items-center gap-1 mt-1">
+                                                        <Eye size={12}/> Voir détails
+                                                    </button>
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-gray-500">
+                                                    {order.created_at ? new Date(order.created_at).toLocaleDateString() : "-"}
+                                                </td>
+                                                <td className="px-6 py-4 font-bold">{order.total_amount} TND</td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`px-3 py-1 text-xs font-bold rounded-full 
+                                                        ${order.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' : 
+                                                        order.status === 'VALIDATED' ? 'bg-green-100 text-green-800' : 
+                                                        order.status === 'SHIPPED' ? 'bg-blue-100 text-blue-800' : 
+                                                        'bg-red-100 text-red-800'}`}>
+                                                        {order.status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 flex items-center gap-2">
+                                                    {order.status === 'PENDING' && (
+                                                        <button onClick={() => requestStatusChange(order.id, 'VALIDATED')} className="p-2 rounded bg-green-50 text-green-600 hover:bg-green-100"><CheckCircle size={18} /></button>
+                                                    )}
+                                                    {order.status === 'VALIDATED' && (
+                                                        <button onClick={() => requestStatusChange(order.id, 'SHIPPED')} className="p-2 rounded bg-blue-50 text-blue-600 hover:bg-blue-100"><Truck size={18} /></button>
+                                                    )}
+                                                    <button onClick={() => requestDelete(order.id)} className="p-2 rounded bg-red-50 text-red-600 hover:bg-red-100"><Trash2 size={18} /></button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
+                                                Aucune commande trouvée pour ces critères.
                                             </td>
                                         </tr>
-                                    ))}
+                                    )}
                                 </tbody>
                             </table>
                         </div>
@@ -299,7 +422,7 @@ const AdminDashboard = () => {
             )}
 
             {/* =========================================================================
-                                             ONGLET UTILISATEURS
+                                            ONGLET UTILISATEURS
                ========================================================================= */}
             {activeTab === 'users' && (
                 <div className="animate-fade-in">
@@ -345,7 +468,6 @@ const AdminDashboard = () => {
                                                 {u.points} pts
                                             </span>
                                         </td>
-                                        {/* 👇 CELLULE MODIFIÉE POUR AJOUTER LE BOUTON SUPPRIMER 👇 */}
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex justify-end items-center gap-2">
                                                 <button 
@@ -372,10 +494,10 @@ const AdminDashboard = () => {
             )}
 
             {/* =========================================================================
-                                                 MODALS
+                                                MODALS
                ========================================================================= */}
 
-            {/* MODAL DETAILS COMMANDE */}
+            {/* MODAL DETAILS COMMANDE (Identique précédent) */}
             {selectedOrder && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
                     <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 relative max-h-[90vh] overflow-y-auto">
@@ -384,11 +506,10 @@ const AdminDashboard = () => {
                         </button>
                         
                         <h2 className="text-2xl font-bold mb-6 text-gray-800 border-b pb-2">
-                            Commande #{selectedOrder.id.slice(-6)}
+                            Commande #{selectedOrder.id.slice(0, 8)}...
                         </h2>
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                            {/* Infos Client */}
                             <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
                                 <h3 className="text-xs font-bold text-blue-500 uppercase mb-3 flex items-center gap-2">
                                     <Users size={14}/> Client
@@ -398,7 +519,6 @@ const AdminDashboard = () => {
                                 <p className="text-gray-600 text-sm">{selectedOrder.phone || "Pas de téléphone"}</p>
                             </div>
 
-                            {/* Infos Livraison */}
                             <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-100">
                                 <h3 className="text-xs font-bold text-yellow-600 uppercase mb-3 flex items-center gap-2">
                                     <Truck size={14}/> Livraison
@@ -408,12 +528,10 @@ const AdminDashboard = () => {
                             </div>
                         </div>
 
-                        {/* Liste Produits */}
                         <div className="mb-6">
                             <h3 className="text-xs font-bold text-gray-500 uppercase mb-3 flex items-center gap-2">
-                                <ShoppingBag size={14}/> Contenu du colis ({selectedOrder.items ? selectedOrder.items.length : 0})
+                                <ShoppingBag size={14}/> Contenu du colis
                             </h3>
-                            
                             <div className="bg-white border rounded-lg overflow-hidden">
                                 {selectedOrder.items && selectedOrder.items.length > 0 ? (
                                     <table className="w-full text-sm text-left">
@@ -429,19 +547,10 @@ const AdminDashboard = () => {
                                             {selectedOrder.items.map((item, index) => (
                                                 <tr key={index} className="hover:bg-gray-50">
                                                     <td className="p-3 text-gray-800 flex items-center gap-3">
-                                                        {/* Image miniature */}
                                                         <div className="w-10 h-10 bg-gray-200 rounded overflow-hidden flex-shrink-0 border">
                                                             {item.image ? (
-                                                                <img 
-                                                                    src={item.image.startsWith('http') ? item.image : `http://127.0.0.1:8000${item.image}`} 
-                                                                    alt="" 
-                                                                    className="w-full h-full object-cover"
-                                                                />
-                                                            ) : (
-                                                                <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                                                    <Package size={16}/>
-                                                                </div>
-                                                            )}
+                                                                <img src={item.image.startsWith('http') ? item.image : `http://127.0.0.1:8000${item.image}`} alt="" className="w-full h-full object-cover"/>
+                                                            ) : (<Package size={16} className="m-auto text-gray-400"/>)}
                                                         </div>
                                                         <span className="font-medium">{item.title}</span>
                                                     </td>
@@ -453,31 +562,21 @@ const AdminDashboard = () => {
                                         </tbody>
                                     </table>
                                 ) : (
-                                    <div className="p-8 text-center text-gray-500 flex flex-col items-center">
-                                        <Package size={40} className="mb-2 text-gray-300"/>
-                                        <p>Détails produits non disponibles.</p>
-                                    </div>
+                                    <div className="p-4 text-center text-gray-500">Pas de détails produits</div>
                                 )}
                             </div>
                         </div>
-
-                        {/* Total Final */}
                         <div className="flex justify-end border-t pt-4">
                             <div className="text-right">
                                 <p className="text-gray-500 text-sm">Total Commande</p>
                                 <p className="text-3xl font-bold text-bahri-blue">{selectedOrder.total_amount} <span className="text-lg">TND</span></p>
                             </div>
                         </div>
-
-                        <div className="mt-6 flex justify-end">
-                            <button onClick={() => setSelectedOrder(null)} className="bg-gray-100 text-gray-700 px-6 py-2 rounded-lg font-bold hover:bg-gray-200 transition">
-                                Fermer
-                            </button>
-                        </div>
                     </div>
                 </div>
             )}
-            {/* MODAL GESTION UTILISATEUR (NOUVEAU) */}
+
+            {/* MODAL GESTION UTILISATEUR */}
             {showUserModal && selectedUser && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 relative max-h-[90vh] overflow-y-auto">
@@ -486,7 +585,6 @@ const AdminDashboard = () => {
                             <button onClick={() => setShowUserModal(false)} className="text-gray-400 hover:text-gray-600"><XCircle size={24}/></button>
                         </div>
 
-                        {/* Modification Points */}
                         <div className="bg-blue-50 p-5 rounded-lg mb-6 border border-blue-100">
                             <h3 className="font-bold text-blue-800 mb-3 flex items-center gap-2"><DollarSign size={18}/> Modifier le solde de points</h3>
                             <div className="flex flex-col md:flex-row gap-3">
@@ -510,11 +608,10 @@ const AdminDashboard = () => {
                             <p className="text-xs text-gray-500 mt-2">Solde actuel : <strong>{selectedUser.points} pts</strong>. Entrez le NOUVEAU total désiré.</p>
                         </div>
 
-                        {/* Historique */}
                         <h3 className="font-bold mb-3 flex items-center gap-2"><History size={18}/> Historique des mouvements</h3>
-                        <div className="border rounded-lg overflow-hidden">
+                        <div className="border rounded-lg overflow-hidden max-h-60 overflow-y-auto">
                             <table className="w-full text-sm text-left">
-                                <thead className="bg-gray-100">
+                                <thead className="bg-gray-100 sticky top-0">
                                     <tr>
                                         <th className="px-4 py-2">Date</th>
                                         <th className="px-4 py-2">Action</th>
@@ -544,7 +641,7 @@ const AdminDashboard = () => {
                 </div>
             )}
 
-            {/* MODAL AJOUT UTILISATEUR (NOUVEAU) */}
+            {/* MODAL AJOUT UTILISATEUR */}
             {showAddUserModal && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 relative">
@@ -587,7 +684,6 @@ const AdminDashboard = () => {
                     </div>
                 </div>
             )}
-
         </div>
     );
 };
