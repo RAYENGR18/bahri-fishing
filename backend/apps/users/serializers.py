@@ -4,29 +4,27 @@ from .models import User, PointsHistory
 # =================================================================
 # 1. SERIALIZERS PUBLICS (PROFIL & LOGIN)
 # =================================================================
-
 class UserSerializer(serializers.Serializer):
     """Pour l'affichage du profil utilisateur"""
-    id = serializers.CharField(read_only=True)
+    # 👇 CORRECTION : On force la conversion en string
+    id = serializers.SerializerMethodField() 
+    
     email = serializers.EmailField()
     first_name = serializers.CharField()
     last_name = serializers.CharField()
-    
-    # --- Modifié : IntField au lieu de DecimalField ---
-    points = serializers.IntegerField(read_only=True) 
-    
-    # --- Nouveaux champs Google ---
+    points = serializers.IntegerField(read_only=True)
     avatar = serializers.CharField(required=False, allow_blank=True)
     google_id = serializers.CharField(required=False, read_only=True)
-    
-    # --- Champs contact (Peuvent être vides si compte Google récent) ---
     phone = serializers.CharField(required=False, allow_blank=True)
     address = serializers.CharField(required=False, allow_blank=True)
     city = serializers.CharField(required=False, allow_blank=True)
     zip_code = serializers.CharField(required=False, allow_blank=True)
     country = serializers.CharField(required=False, allow_blank=True)
-    
     is_admin = serializers.BooleanField(read_only=True)
+
+    # 👇 Méthode magique pour convertir l'ObjectId en String
+    def get_id(self, obj):
+        return str(obj.id)
 
 
 class LoginSerializer(serializers.Serializer):
@@ -101,24 +99,33 @@ class UpdateProfileSerializer(serializers.Serializer):
 # =================================================================
 
 class PointsHistorySerializer(serializers.Serializer):
-    """Pour afficher l'historique des points dans le tableau admin"""
+    # 👇 Idem ici par sécurité
+    id = serializers.SerializerMethodField()
     action = serializers.CharField()
     amount = serializers.IntegerField()
     reason = serializers.CharField()
     created_at = serializers.DateTimeField()
     admin_name = serializers.SerializerMethodField()
 
+    def get_id(self, obj):
+        return str(obj.id)
+
     def get_admin_name(self, obj):
-        # Si un admin a fait l'action, on affiche son prénom, sinon "Système"
         return obj.admin.first_name if obj.admin else "Système"
 
 
 class AdminUserSerializer(serializers.Serializer):
-    """Vue simplifiée pour la liste des utilisateurs dans le Dashboard"""
-    id = serializers.CharField(source="id")
+    """Vue simplifiée pour la liste des utilisateurs"""
+    # 👇 CORRECTION MAJEURE ICI
+    id = serializers.SerializerMethodField()
+    
     email = serializers.EmailField()
     first_name = serializers.CharField()
     last_name = serializers.CharField()
-    points = serializers.IntegerField() # Le nouveau champ Int
+    points = serializers.IntegerField()
     is_admin = serializers.BooleanField()
     date_joined = serializers.DateTimeField()
+
+    # 👇 C'est ça qui empêchera le crash 500 à l'avenir
+    def get_id(self, obj):
+        return str(obj.id)
